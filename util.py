@@ -37,6 +37,33 @@ def select_device():
     return device
 
 
+# List all checkpoints and select one
+def select_checkpoint(path="checkpoints/"):
+    # run_name + [seed]
+    folders = os.listdir(path)
+
+    run_names = set()
+    for folder in folders:
+        if folder.endswith("]"):
+            run_names.add(folder.split("[")[0])
+    run_names = list(run_names)
+    run_idx = survey.routines.select("Select run", options=run_names)
+    run = run_names[run_idx]
+
+    seeds = set()
+    for folder in folders:
+        if folder.endswith("]"):
+            if folder.split("[")[0] == run:
+                seeds.add(folder.split("[")[1].split("]")[0])
+    seeds = list(seeds)
+
+    seed_idx = survey.routines.select("Select seed", options=seeds)
+
+    seed = seeds[seed_idx]
+    
+    return os.path.join(path, run + f"[{seed}]")
+
+
 class Trainer:
     def __init__(self, model, optimizer, scheduler, criterion, device="cpu"):
         self.model = model
