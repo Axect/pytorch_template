@@ -6,6 +6,7 @@ import survey
 import wandb
 
 import random
+import os
 
 
 def load_data(ratio=0.8, seed=42):
