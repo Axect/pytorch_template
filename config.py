@@ -1,5 +1,9 @@
 import torch
 from torch import nn
+from torch.optim.adamw import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from hyperbolic_lr import HyperbolicLR, ExpHyperbolicLR
+import survey
 
 from model import MLP
 
@@ -78,6 +82,28 @@ class RunConfig:
         with open(path, "w") as f:
             json.dump(self.gen_config(), f)
 
+    def from_json(self, path):
+        with open(path, "r") as f:
+            config = json.load(f)
+
+        self.project = config["project"]
+        self.device = config["device"]
+        self.epochs = config["epochs"]
+        self.batch_size = config["batch_size"]
+
+        self.net = eval(config["net"])
+        self.optimizer = eval(config["optimizer"])
+        self.scheduler = eval(config["scheduler"])
+
+        for k in self.net_config:
+            if k in config:
+                self.net_config[k] = config[k]
+        for k in self.optimizer_config:
+            if k in config:
+                self.optimizer_config[k] = config[k]
+        for k in self.scheduler_config:
+            if k in config:
+                self.scheduler_config[k] = config[k]
 
 
 def default_run_config():
@@ -101,3 +127,46 @@ def default_run_config():
             "eta_min": 1e-5,
         },
     )
+
+
+def scheduler_setup(lr: float, epochs: int):
+    schedulers = {
+        "CosineAnnealingLR": CosineAnnealingLR,
+        "HyperbolicLR": HyperbolicLR,
+        "ExpHyperbolicLR": ExpHyperbolicLR,
+    }
+    schedulers_name = list(schedulers.keys())
+    scheduler_idx = survey.routines.select("Scheduler", options=schedulers_name)
+    scheduler_name = schedulers_name[scheduler_idx]
+    scheduler = schedulers[scheduler_name]
+    scheduler_config = {}
+    if scheduler_name == "CosineAnnealingLR":
+        T_max = epochs
+        eta_min = survey.routines.numeric(
+            "Input eta_min",
+            decimal=True
+        )
+        scheduler_config = {
+            "T_max": T_max,
+            "eta_min": eta_min,
+        }
+    elif scheduler_name in ["HyperbolicLR", "ExpHyperbolicLR"]:
+        upper_bound = survey.routines.numeric(
+            "Input upper_bound",
+            decimal=False
+        )
+        max_iter = epochs
+        init_lr = lr
+        infimum_lr = survey.routines.numeric(
+            "Input infimum_lr",
+            decimal=True
+        )
+        scheduler_config = {
+            "upper_bound": upper_bound,
+            "max_iter": max_iter,
+            "init_lr": init_lr,
+            "infimum_lr": infimum_lr,
+        }
+    else:
+        raise ValueError("Invalid scheduler")
+    return scheduler, scheduler_config
