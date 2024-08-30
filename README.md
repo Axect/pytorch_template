@@ -30,7 +30,7 @@ You can set up this project in two ways:
 
 After setting up the repository, install the required packages:
 ```
-pip install torch wandb survey polars numpy
+pip install torch wandb survey polars numpy optuna
 ```
 
 (Optional) Set up a Weights & Biases account for experiment tracking.

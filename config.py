@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.optim.adam import Adam
 from torch.optim.adamw import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from hyperbolic_lr import HyperbolicLR, ExpHyperbolicLR
@@ -81,6 +82,16 @@ class RunConfig:
             configs[k] = v
         return configs
 
+    def optimizable_config(self):
+        optimizable = {}
+        for k, v in self.net_config.items():
+            optimizable[k] = v
+        for k, v in self.optimizer_config.items():
+            optimizable[k] = v
+        for k, v in self.scheduler_config.items():
+            optimizable[k] = v
+        return optimizable
+
     def to_json(self, path):
         with open(path, "w") as f:
             json.dump(self.gen_config(), f)
@@ -130,6 +141,69 @@ def default_run_config():
             "eta_min": 1e-5,
         },
     )
+
+
+def model_setup():
+    models = {
+        "MLP": MLP,
+    }
+    model_name = list(models.keys())
+    model_idx = survey.routines.select("Model", options=model_name)
+    model_name = model_name[model_idx] # pyright: ignore
+    model = models[model_name]
+    model_config = {}
+    if model_name == "MLP":
+        nodes = survey.routines.numeric(
+            "Input nodes",
+            decimal=False
+        )
+        layers = survey.routines.numeric(
+            "Input layers",
+            decimal=False
+        )
+        model_config = {
+            "nodes": nodes,
+            "layers": layers,
+        }
+    else:
+        raise ValueError("Model name not found.")
+    return model, model_config
+
+
+def optimizer_setup(change_betas: bool, change_weight_decay: bool):
+    optimizers = {
+        "Adam": Adam,
+        "AdamW": AdamW,
+    }
+    optimizer_name = list(optimizers.keys())
+    optimizer_idx = survey.routines.select("Optimizer", options=optimizer_name)
+    optimizer_name = optimizer_name[optimizer_idx] # pyright: ignore
+    optimizer = optimizers[optimizer_name]
+    optimizer_config = {}
+    lr = survey.routines.numeric(
+        "Input Learning Rate",
+        decimal=True
+    )
+    optimizer_config["lr"] = lr
+    if change_betas:
+        betas = [
+            survey.routines.numeric(
+                "Input beta1",
+                decimal=True
+            ),
+            survey.routines.numeric(
+                "Input beta2",
+                decimal=True
+            ),
+        ]
+        optimizer_config["betas"] = betas
+    if change_weight_decay:
+        weight_decay = survey.routines.numeric(
+            "Input weight_decay",
+            decimal=True
+        )
+        optimizer_config["weight_decay"] = weight_decay
+    return optimizer, optimizer_config
 
 
 def scheduler_setup(lr: float, epochs: int):
