@@ -15,7 +15,7 @@ class RunConfig:
     project: str
     device: str
     net: nn.Module
-    optimizer: torch.optim.Optimizer
+    optimizer: torch.optim.Optimizer                    # pyright: ignore
     scheduler: torch.optim.lr_scheduler._LRScheduler
     epochs: int
     batch_size: int
@@ -27,10 +27,10 @@ class RunConfig:
         return self.net(self.net_config, device=self.device)
 
     def create_optimizer(self, model):
-        return self.optimizer(model.parameters(), **self.optimizer_config)
+        return self.optimizer(model.parameters(), **self.optimizer_config) # pyright: ignore
 
     def create_scheduler(self, optimizer):
-        return self.scheduler(optimizer, **self.scheduler_config)
+        return self.scheduler(optimizer, **self.scheduler_config) # pyright: ignore
 
     def gen_group_name(self):
         name = f"{self.net.__name__}"
@@ -58,6 +58,9 @@ class RunConfig:
         for k, v in self.net_config.items():
             tags.append(f"{k[0]}={v}")
 
+        tags.append(self.optimizer.__name__) # pyright: ignore
+        tags.append(self.scheduler.__name__) # pyright: ignore
+
         return tags
 
     def gen_config(self):
@@ -65,8 +68,8 @@ class RunConfig:
             "project": self.project,
             "device": self.device,
             "net": self.net.__name__,
-            "optimizer": self.optimizer.__name__,
-            "scheduler": self.scheduler.__name__,
+            "optimizer": self.optimizer.__name__, # pyright: ignore
+            "scheduler": self.scheduler.__name__, # pyright: ignore
             "epochs": self.epochs,
             "batch_size": self.batch_size,
         }
@@ -110,9 +113,9 @@ def default_run_config():
     return RunConfig(
         project="PyTorch_Template",
         device="cpu",
-        net=MLP,
-        optimizer=torch.optim.AdamW,
-        scheduler=torch.optim.lr_scheduler.CosineAnnealingLR,
+        net=MLP,                                                # pyright: ignore
+        optimizer=torch.optim.AdamW,                            # pyright: ignore
+        scheduler=torch.optim.lr_scheduler.CosineAnnealingLR,   # pyright: ignore
         epochs=50,
         batch_size=256,
         net_config={
@@ -137,7 +140,7 @@ def scheduler_setup(lr: float, epochs: int):
     }
     schedulers_name = list(schedulers.keys())
     scheduler_idx = survey.routines.select("Scheduler", options=schedulers_name)
-    scheduler_name = schedulers_name[scheduler_idx]
+    scheduler_name = schedulers_name[scheduler_idx] # pyright: ignore
     scheduler = schedulers[scheduler_name]
     scheduler_config = {}
     if scheduler_name == "CosineAnnealingLR":
