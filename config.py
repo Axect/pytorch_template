@@ -10,6 +10,7 @@ from model import MLP
 
 from dataclasses import dataclass
 import json
+import yaml
 
 @dataclass
 class RunConfig:
@@ -140,6 +141,40 @@ def default_run_config():
             "T_max": 50,
             "eta_min": 1e-5,
         },
+    )
+
+
+@classmethod
+def from_yaml(cls, path):
+    available_models = {
+        "MLP": MLP
+    }
+    available_optimizers = {
+        "Adam": torch.optim.adam.Adam,
+        "AdamW": torch.optim.adamw.AdamW
+    }
+    available_schedulers = {
+        "PolynomialLR": torch.optim.lr_scheduler.PolynomialLR,
+        "CosineAnnealingLR": torch.optim.lr_scheduler.CosineAnnealingLR,
+        "ExponentialLR": torch.optim.lr_scheduler.ExponentialLR,
+        "HyperbolicLR": HyperbolicLR,
+        "ExpHyperbolicLR": ExpHyperbolicLR
+    }
+
+    with open(path, 'r') as file:
+        config = yaml.safe_load(file)
+    
+    return cls(
+        project=config['project'],
+        device=config['device'],
+        net=available_models[config['net']],
+        optimizer=available_optimizers[config['optimizer']],
+        scheduler=available_schedulers[config['scheduler']],
+        epochs=config['epochs'],
+        batch_size=config['batch_size'],
+        net_config=config['net_config'],
+        optimizer_config=config['optimizer_config'],
+        scheduler_config=config['scheduler_config']
     )
 
 

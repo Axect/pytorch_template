@@ -3,8 +3,8 @@ from torch import nn
 import torch.nn.functional as F
 import wandb
 import survey
+import optuna
 
-from model import MLP
 from util import load_data, set_seed, select_device, Trainer
 from config import RunConfig, model_setup, optimizer_setup, scheduler_setup
 
@@ -114,7 +114,9 @@ def main():
     if run_mode == 'Run':
         run(run_config, seeds, dl_train, dl_val)
     elif run_mode == 'Optimize':
-        optimizable_config = run_config.optimizable_config()
+        #optimizable_config = run_config.optimizable_config()
+        opt_config_file = survey.routines.input("Input optimize config file: ")
+
 
 if __name__ == "__main__":
     main()
