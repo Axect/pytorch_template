@@ -9,9 +9,10 @@ import optuna
 
 from model import MLP
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import yaml
 import importlib
+
 
 @dataclass
 class RunConfig:
@@ -79,10 +80,6 @@ class RunConfig:
         return asdict(self)
 
 
-def abbreviate(s: str):
-    return ''.join([w for w in s if w.isupper()])
-
-
 def default_run_config():
     return RunConfig(
         project="PyTorch_Template",
@@ -107,26 +104,56 @@ def default_run_config():
     )
 
 
+@dataclass
 class OptimizeConfig:
-    def __init__(self, config):
-        self.trials = config['optimize']['trials']
-        self.algorithm = config['optimize']['algorithm']
-        self.metric = config['optimize']['metric']
-        self.direction = config['optimize']['direction']
-        self.search_space = config['search_space']
+    study_name: str
+    trials: int
+    seed: int
+    metric: str
+    direction: str
+    sampler: dict = field(default_factory=dict)
+    pruner: dict = field(default_factory=dict)
+    search_space: dict = field(default_factory=dict)
 
     @classmethod
     def from_yaml(cls, path):
         with open(path, 'r') as file:
             config = yaml.safe_load(file)
-        return cls(config)
+        return cls(**config)
 
     def to_yaml(self, path):
         with open(path, 'w') as file:
             yaml.dump(asdict(self), file, sort_keys=False)
 
-    def create_study(self):
-        return optuna.create_study(direction=self.direction)
+    def _create_sampler(self):
+        module_name, class_name = self.sampler["name"].rsplit('.', 1)
+        module = importlib.import_module(module_name)
+        sampler_class = getattr(module, class_name)
+        sampler_kwargs = self.sampler.get('kwargs', {})
+        return sampler_class(**sampler_kwargs)
+
+    def _create_pruner(self):
+        if not self.pruner:
+            return None
+        module_name, class_name = self.pruner["name"].rsplit('.', 1)
+        module = importlib.import_module(module_name)
+        pruner_class = getattr(module, class_name)
+        pruner_kwargs = self.pruner.get('kwargs', {})
+        return pruner_class(**pruner_kwargs)
+
+    def create_study(self, project):
+        sampler = self._create_sampler()
+        study = {
+            'study_name': self.study_name,
+            'storage': f'sqlite:///{project}.db',
+            'sampler': sampler,
+            'direction': self.direction,
+            'load_if_exists': True,
+        }
+        pruner = self._create_pruner()
+        if pruner:
+            study['pruner'] = pruner
+        return optuna.create_study(**study)
 
     def suggest_params(self, trial):
         params = {}
@@ -140,14 +167,21 @@ class OptimizeConfig:
                                                                 step=param_config.get('step', 1))
                 elif param_config['type'] == 'float':
                     if param_config.get('log', False):
-                        params[category][param] = trial.suggest_loguniform(f"{category}_{param}", 
-                                                                           param_config['min'], 
-                                                                           param_config['max'])
+                        params[category][param] = trial.suggest_float(f"{category}_{param}", 
+                                                                      param_config['min'], 
+                                                                      param_config['max'],
+                                                                      log=True)
                     else:
-                        params[category][param] = trial.suggest_uniform(f"{category}_{param}", 
-                                                                        param_config['min'], 
-                                                                        param_config['max'])
+                        params[category][param] = trial.suggest_float(f"{category}_{param}", 
+                                                                      param_config['min'], 
+                                                                      param_config['max'])
                 elif param_config['type'] == 'categorical':
                     params[category][param] = trial.suggest_categorical(f"{category}_{param}", 
                                                                         param_config['choices'])
         return params
+
+
+def abbreviate(s: str):
+    return ''.join([w for w in s if w.isupper()])
+
+

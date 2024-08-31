@@ -13,6 +13,7 @@ import random
 import numpy as np
 import argparse
 import os
+import copy
 
 
 def main():
@@ -36,15 +37,15 @@ def main():
         def objective(trial, base_config, optimize_config, dl_train, dl_val):
             params = optimize_config.suggest_params(trial)
             
-            config = base_config.copy()
+            config = base_config.gen_config()
             for category, category_params in params.items():
                 config[category].update(category_params)
             
             run_config = RunConfig(**config)
-            return run(run_config, run_config.seeds, dl_train, dl_val)
+            return run(run_config, dl_train, dl_val)
 
         optimize_config = OptimizeConfig.from_yaml(args.optimize_config)
-        study = optimize_config.create_study()
+        study = optimize_config.create_study(project=base_config.project)
         study.optimize(lambda trial: objective(trial, base_config, optimize_config, dl_train, dl_val), n_trials=optimize_config.trials)
 
         print("Best trial:")
