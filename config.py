@@ -35,7 +35,7 @@ class RunConfig:
 
     def to_yaml(self, path: str):
         with open(path, 'w') as file:
-            yaml.dump(asdict(self), file)
+            yaml.dump(asdict(self), file, sort_keys=False)
 
     def create_model(self):
         module_name, class_name = self.net.rsplit('.', 1)
@@ -59,8 +59,10 @@ class RunConfig:
         name = f"{self.net.split('.')[-1]}"
         for k, v in self.net_config.items():
             name += f"_{k[0]}_{v}"
+        name += f"_{abbreviate(self.optimizer.split('.')[-1])}"
         for k, v in self.optimizer_config.items():
             name += f"_{k[0]}_{v:.4e}" if isinstance(v, float) else f"_{k[0]}_{v}"
+        name += f"_{abbreviate(self.scheduler.split('.')[-1])}"
         for k, v in self.scheduler_config.items():
             name += f"_{k[0]}_{v:.4e}" if isinstance(v, float) else f"_{k[0]}_{v}"
         return name
@@ -75,6 +77,10 @@ class RunConfig:
 
     def gen_config(self):
         return asdict(self)
+
+
+def abbreviate(s: str):
+    return ''.join([w for w in s if w.isupper()])
 
 
 def default_run_config():
@@ -117,7 +123,7 @@ class OptimizeConfig:
 
     def to_yaml(self, path):
         with open(path, 'w') as file:
-            yaml.dump(asdict(self), file)
+            yaml.dump(asdict(self), file, sort_keys=False)
 
     def create_study(self):
         return optuna.create_study(direction=self.direction)

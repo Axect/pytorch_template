@@ -1,5 +1,7 @@
 import torch
 from torch import nn
+from torch.utils.data import TensorDataset
+import torch.nn.functional as F
 import polars as pl
 import numpy as np
 import survey
@@ -9,10 +11,29 @@ from config import RunConfig
 
 import random
 import os
+from math import pi
 
 
-def load_data(ratio=0.8, seed=42):
-    pass
+def load_data(n=10000, split_ratio=0.8, seed=42):
+    # Fix Seed
+    torch.manual_seed(seed)
+
+    x = torch.linspace(0, 1, n) + torch.rand(n) * 0.01
+    y = torch.cos(x * (2 * pi)) + torch.rand(n) * 0.01
+
+    ics = torch.randperm(n)
+    ics_train = ics[:int(n * split_ratio)]
+    ics_val   = ics[int(n * split_ratio):]
+
+    x_train = x[ics_train].view(-1, 1)
+    y_train = y[ics_train].view(-1, 1)
+    x_val   = x[ics_val].view(-1, 1)
+    y_val   = y[ics_val].view(-1, 1)
+
+    train_ds    = TensorDataset(x_train, y_train)
+    val_ds      = TensorDataset(x_val, y_val)
+
+    return train_ds, val_ds
 
 
 def set_seed(seed: int):
@@ -124,19 +145,24 @@ class Trainer:
 def run(run_config: RunConfig, dl_train, dl_val):
     project = run_config.project
     device = run_config.device
-
+    seeds = run_config.seeds
     group_name = run_config.gen_group_name()
     tags = run_config.gen_tags()
 
+    group_path = f"runs/{run_config.project}/{group_name}"
+    if not os.path.exists(group_path):
+        os.makedirs(group_path)
+    run_config.to_yaml(f"{group_path}/config.yaml")
+
     total_loss = 0
-    for seed in run_config.seeds:
+    for seed in seeds:
         set_seed(seed)
 
         model = run_config.create_model().to(device)
         optimizer = run_config.create_optimizer(model)
         scheduler = run_config.create_scheduler(optimizer)
 
-        run_name = group_name + f"[{seed}]"
+        run_name = f"{seed}"
         wandb.init(
             project=project,
             name=run_name,
@@ -150,10 +176,11 @@ def run(run_config: RunConfig, dl_train, dl_val):
         total_loss += val_loss
 
         # Save model & configs
-        if not os.path.exists(f"checkpoints/{run_name}"):
-            os.makedirs(f"checkpoints/{run_name}")
-        torch.save(model.state_dict(), f"checkpoints/{run_name}/model.pt")
-        run_config.to_yaml(f"checkpoints/{run_name}/run_config.yaml")
+        run_path = f"{group_path}/{run_name}"
+        if not os.path.exists(run_path):
+            os.makedirs(run_path)
+        torch.save(model.state_dict(), f"{run_path}/model.pt")
 
         wandb.finish() # pyright: ignore
+
     return total_loss / len(seeds)

@@ -1,11 +1,12 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 import wandb
 import survey
 import optuna
 
-from util import load_data, set_seed, select_device, Trainer
+from util import load_data, set_seed, select_device, Trainer, run
 from config import RunConfig, OptimizeConfig
 
 import random
@@ -22,17 +23,16 @@ def main():
 
     wandb.require("core") # pyright: ignore
 
-    device = select_device()
-    print(f"device: {device}")
-
-    # Load data
-    dl_train, dl_val = load_data() # pyright: ignore
-
     # Run Config
     base_config = RunConfig.from_yaml(args.run_config)
 
+    # Load data
+    ds_train, ds_val = load_data() # pyright: ignore
+    dl_train = DataLoader(ds_train, batch_size=base_config.batch_size, shuffle=True)
+    dl_val = DataLoader(ds_val, batch_size=base_config.batch_size)
+
     # Run
-    if args.optimize:
+    if args.optimize_config:
         def objective(trial, base_config, optimize_config, dl_train, dl_val):
             params = optimize_config.suggest_params(trial)
             

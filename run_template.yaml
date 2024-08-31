@@ -1,16 +1,16 @@
 project: PyTorch_Template
 device: cuda:0
 net: model.MLP
-optimizer: torch.optim.AdamW
+optimizer: torch.optim.adamw.AdamW
 scheduler: torch.optim.lr_scheduler.CosineAnnealingLR
 epochs: 50
 batch_size: 256
 seeds: [89, 231, 928, 814, 269]
 net_config:
-  nodes: 128
+  nodes: 64
   layers: 4
 optimizer_config:
-  lr: 1e-3
+  lr: 1.e-3 # Must contain dot for float
 scheduler_config:
   T_max: 50
-  eta_min: 1e-5
+  eta_min: 1.e-5 
