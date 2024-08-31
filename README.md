@@ -97,4 +97,15 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is provided as a template and is intended to be freely used, modified, and distributed. Users of this template are encouraged to choose a license that best suits their specific project needs. 
+
+For the template itself:
+- You are free to use, modify, and distribute this template.
+- No attribution is required, although it is appreciated.
+- The template is provided "as is", without warranty of any kind.
+
+When using this template for your own project, please remember to:
+1. Remove this license section or replace it with your chosen license.
+2. Ensure all dependencies and libraries used in your project comply with their respective licenses.
+
+For more information on choosing a license, visit [choosealicense.com](https://choosealicense.com/).
