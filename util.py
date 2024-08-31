@@ -5,6 +5,8 @@ import numpy as np
 import survey
 import wandb
 
+from config import RunConfig
+
 import random
 import os
 
@@ -117,3 +119,41 @@ class Trainer:
             if epoch % 10 == 0:
                 print(f"epoch: {epoch}, train_loss: {train_loss}, val_loss: {val_loss}, lr: {self.optimizer.param_groups[0]['lr']}")
         return val_loss
+
+
+def run(run_config: RunConfig, dl_train, dl_val):
+    project = run_config.project
+    device = run_config.device
+
+    group_name = run_config.gen_group_name()
+    tags = run_config.gen_tags()
+
+    total_loss = 0
+    for seed in run_config.seeds:
+        set_seed(seed)
+
+        model = run_config.create_model().to(device)
+        optimizer = run_config.create_optimizer(model)
+        scheduler = run_config.create_scheduler(optimizer)
+
+        run_name = group_name + f"[{seed}]"
+        wandb.init(
+            project=project,
+            name=run_name,
+            group=group_name,
+            tags=tags,
+            config=run_config.gen_config(),
+        )
+
+        trainer = Trainer(model, optimizer, scheduler, criterion=F.mse_loss, device=device)
+        val_loss = trainer.train(dl_train, dl_val, epochs=run_config.epochs)
+        total_loss += val_loss
+
+        # Save model & configs
+        if not os.path.exists(f"checkpoints/{run_name}"):
+            os.makedirs(f"checkpoints/{run_name}")
+        torch.save(model.state_dict(), f"checkpoints/{run_name}/model.pt")
+        run_config.to_yaml(f"checkpoints/{run_name}/run_config.yaml")
+
+        wandb.finish() # pyright: ignore
+    return total_loss / len(seeds)

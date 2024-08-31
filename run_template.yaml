@@ -1,8 +1,8 @@
 project: PyTorch_Template
 device: cuda:0
-net: MLP
-optimizer: AdamW
-scheduler: CosineAnnealingLR
+net: model.MLP
+optimizer: torch.optim.AdamW
+scheduler: torch.optim.lr_scheduler.CosineAnnealingLR
 epochs: 50
 batch_size: 256
 seeds: [89, 231, 928, 814, 269]
