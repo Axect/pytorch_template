@@ -48,46 +48,6 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-def select_device():
-    device_count = torch.cuda.device_count()
-    if device_count >= 1:
-        options = [f"cuda:{i}" for i in range(device_count)] + ["cpu"]
-        device_index = survey.routines.select(
-            "Select device", options=options
-        )
-        device = options[device_index]
-    else:
-        device = "cpu"
-    return device
-
-
-# List all checkpoints and select one
-def select_checkpoint(path="checkpoints/"):
-    # run_name + [seed]
-    folders = os.listdir(path)
-
-    run_names = set()
-    for folder in folders:
-        if folder.endswith("]"):
-            run_names.add(folder.split("[")[0])
-    run_names = list(run_names)
-    run_idx = survey.routines.select("Select run", options=run_names)
-    run = run_names[run_idx]
-
-    seeds = set()
-    for folder in folders:
-        if folder.endswith("]"):
-            if folder.split("[")[0] == run:
-                seeds.add(folder.split("[")[1].split("]")[0])
-    seeds = list(seeds)
-
-    seed_idx = survey.routines.select("Select seed", options=seeds)
-
-    seed = seeds[seed_idx]
-    
-    return os.path.join(path, run + f"[{seed}]")
-
-
 class Trainer:
     def __init__(self, model, optimizer, scheduler, criterion, device="cpu"):
         self.model = model
@@ -184,3 +144,72 @@ def run(run_config: RunConfig, dl_train, dl_val):
         wandb.finish() # pyright: ignore
 
     return total_loss / len(seeds)
+
+
+# ┌──────────────────────────────────────────────────────────┐
+#  For Analyze
+# └──────────────────────────────────────────────────────────┘
+def select_group(project):
+    runs_path = f"runs/{project}"
+    groups = [d for d in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, d))]
+    if not groups:
+        raise ValueError(f"No run groups found in {runs_path}")
+    
+    selected_index = survey.routines.select("Select a run group:", options=groups)
+    return groups[selected_index]
+
+def select_seed(project, group_name):
+    group_path = f"runs/{project}/{group_name}"
+    seeds = [d for d in os.listdir(group_path) if os.path.isdir(os.path.join(group_path, d))]
+    if not seeds:
+        raise ValueError(f"No seeds found in {group_path}")
+    
+    selected_index = survey.routines.select("Select a seed:", options=seeds)
+    return seeds[selected_index]
+
+def select_device():
+    devices = ['cpu'] + [f'cuda:{i}' for i in range(torch.cuda.device_count())]
+    selected_index = survey.routines.select("Select a device:", options=devices)
+    return devices[selected_index]
+
+
+def load_model(project, group_name, seed, weights_only=True):
+    """
+    Load a trained model and its configuration.
+
+    Args:
+        project (str): The name of the project.
+        group_name (str): The name of the run group.
+        seed (str): The seed of the specific run.
+        weights_only (bool, optional): If True, only load the model weights without loading the entire pickle file. 
+                                       This can be faster and use less memory. Defaults to True.
+
+    Returns:
+        tuple: A tuple containing the loaded model and its configuration.
+
+    Raises:
+        FileNotFoundError: If the config or model file is not found.
+
+    Example usage:
+        # Load full model
+        model, config = load_model("MyProject", "experiment1", "seed42")
+        
+        # Load only weights (faster and uses less memory)
+        model, config = load_model("MyProject", "experiment1", "seed42", weights_only=True)
+    """
+    config_path = f"runs/{project}/{group_name}/config.yaml"
+    model_path = f"runs/{project}/{group_name}/{seed}/model.pt"
+    
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Config file not found for {project}/{group_name}")
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found for {project}/{group_name}/{seed}")
+    
+    config = RunConfig.from_yaml(config_path)
+    model = config.create_model()
+
+    # Use weights_only option in torch.load
+    state_dict = torch.load(model_path, map_location='cpu', weights_only=weights_only)
+    model.load_state_dict(state_dict)
+    
+    return model, config
