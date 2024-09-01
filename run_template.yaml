@@ -2,7 +2,7 @@ project: PyTorch_Template
 device: cuda:0
 net: model.MLP
 optimizer: torch.optim.adamw.AdamW
-scheduler: torch.optim.lr_scheduler.CosineAnnealingLR
+scheduler: hyperbolic_lr.HyperbolicLR
 epochs: 50
 batch_size: 256
 seeds: [89, 231, 928, 814, 269]
@@ -12,5 +12,6 @@ net_config:
 optimizer_config:
   lr: 1.e-3 # Must contain dot for float
 scheduler_config:
-  T_max: 50
-  eta_min: 1.e-5 
+  upper_bound: 250
+  max_iter: 50
+  infimum_lr: 1.e-5
