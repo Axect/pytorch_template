@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
-from util import select_group, select_seed, select_device, load_model, load_data
+from util import select_group, select_seed, select_device, load_model, load_data, load_study, load_best_model
 
 def test_model(model, dl_val, device):
     model.eval()
@@ -19,12 +19,18 @@ def test_model(model, dl_val, device):
     return total_loss / len(dl_val), all_preds, all_targets
 
 def main():
+    # Test run
     project = "PyTorch_Template"
-    group_name = select_group(project)
-    seed = select_seed(project, group_name)
-    device = select_device()
+    #group_name = select_group(project)
+    #seed = select_seed(project, group_name)
+    #device = select_device()
+    #model, config = load_model(project, group_name, seed)
+    #model = model.to(device)
 
-    model, config = load_model(project, group_name, seed)
+    # Load the best model
+    study_name = "Optimize_Template"
+    model, config = load_best_model(project, study_name)
+    device = select_device()
     model = model.to(device)
 
     _, dl_val = load_data()  # Assuming this is implemented in util.py

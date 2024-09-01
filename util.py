@@ -235,7 +235,7 @@ def load_study(project, study_name):
     return study
 
 
-def load_best_model_from_study(project, study_name, weights_only=True):
+def load_best_model(project, study_name, weights_only=True):
     """
     Load the best model and its configuration from an optimization study.
 
