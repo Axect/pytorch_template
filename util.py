@@ -6,8 +6,9 @@ import polars as pl
 import numpy as np
 import survey
 import wandb
+import optuna
 
-from config import RunConfig
+from config import RunConfig, OptimizeConfig
 
 import random
 import os
@@ -102,11 +103,12 @@ class Trainer:
         return val_loss
 
 
-def run(run_config: RunConfig, dl_train, dl_val):
+def run(run_config: RunConfig, dl_train, dl_val, group_name=None):
     project = run_config.project
     device = run_config.device
     seeds = run_config.seeds
-    group_name = run_config.gen_group_name()
+    if not group_name:
+        group_name = run_config.gen_group_name()
     tags = run_config.gen_tags()
 
     group_path = f"runs/{run_config.project}/{group_name}"
@@ -156,7 +158,7 @@ def select_group(project):
         raise ValueError(f"No run groups found in {runs_path}")
     
     selected_index = survey.routines.select("Select a run group:", options=groups)
-    return groups[selected_index]
+    return groups[selected_index] # pyright: ignore
 
 def select_seed(project, group_name):
     group_path = f"runs/{project}/{group_name}"
@@ -165,12 +167,12 @@ def select_seed(project, group_name):
         raise ValueError(f"No seeds found in {group_path}")
     
     selected_index = survey.routines.select("Select a seed:", options=seeds)
-    return seeds[selected_index]
+    return seeds[selected_index] # pyright: ignore
 
 def select_device():
     devices = ['cpu'] + [f'cuda:{i}' for i in range(torch.cuda.device_count())]
     selected_index = survey.routines.select("Select a device:", options=devices)
-    return devices[selected_index]
+    return devices[selected_index] # pyright: ignore
 
 
 def load_model(project, group_name, seed, weights_only=True):
@@ -213,3 +215,44 @@ def load_model(project, group_name, seed, weights_only=True):
     model.load_state_dict(state_dict)
     
     return model, config
+
+
+def load_study(project, study_name):
+    """
+    Load the best study from an optimization run.
+
+    Args:
+        project (str): The name of the project.
+        study_name (str): The name of the study.
+
+    Returns:
+        optuna.Study: The loaded study object.
+    """
+    study = optuna.load_study(
+        study_name=study_name,
+        storage=f'sqlite:///{project}.db'
+    )
+    return study
+
+
+def load_best_model_from_study(project, study_name, weights_only=True):
+    """
+    Load the best model and its configuration from an optimization study.
+
+    Args:
+        project (str): The name of the project.
+        study_name (str): The name of the study.
+
+    Returns:
+        tuple: A tuple containing the loaded model, its configuration, and the best trial number.
+    """
+    study = load_study(project, study_name)
+    best_trial = study.best_trial
+    project_name = f"{project}_Opt"
+    group_name = best_trial.user_attrs['group_name']
+
+    # Select Seed
+    seed = select_seed(project_name, group_name)
+    best_model, best_config = load_model(project_name, group_name, seed, weights_only=weights_only)
+
+    return best_model, best_config

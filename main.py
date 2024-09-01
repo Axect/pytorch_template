@@ -38,11 +38,17 @@ def main():
             params = optimize_config.suggest_params(trial)
             
             config = base_config.gen_config()
+            config["project"] = f"{base_config.project}_Opt"
             for category, category_params in params.items():
                 config[category].update(category_params)
             
             run_config = RunConfig(**config)
-            return run(run_config, dl_train, dl_val)
+            group_name = run_config.gen_group_name()
+            group_name += f"[{trial.number}]"
+
+            trial.set_user_attr("group_name", group_name)
+
+            return run(run_config, dl_train, dl_val, group_name)
 
         optimize_config = OptimizeConfig.from_yaml(args.optimize_config)
         study = optimize_config.create_study(project=base_config.project)
@@ -54,6 +60,7 @@ def main():
         print("  Params: ")
         for key, value in trial.params.items():
             print(f"    {key}: {value}")
+        print(f"  Path: runs/{base_config.project}_Opt/{trial.user_attrs['group_name']}")
         
     else:
         run(base_config, dl_train, dl_val)
