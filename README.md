@@ -1,7 +1,7 @@
 # PyTorch Template Project
 
 This project provides a flexible template for PyTorch-based machine learning experiments.
-It includes configuration management, logging with Weights & Biases (wandb), and a modular structure for easy customization and hyperparameter optimization.
+It includes configuration management, logging with Weights & Biases (wandb), hyperparameter optimization with Optuna, and a modular structure for easy customization and experimentation.
 
 ## Project Structure
 
@@ -11,18 +11,26 @@ It includes configuration management, logging with Weights & Biases (wandb), and
 - `util.py`: Utility functions for data loading, device selection, training, and analysis.
 - `run_template.yaml`: Template for run configuration.
 - `optimize_template.yaml`: Template for optimization configuration.
+- `analyze.py`: Script for analyzing completed runs and optimizations, utilizing functions from `util.py`.
 
 ## Setup
 
 1. Clone the repository:
-   ```
+   ```sh
    git clone https://github.com/yourusername/pytorch_template.git
    cd pytorch_template
    ```
 
 2. Install the required packages:
-   ```
-   pip install torch wandb survey polars numpy optuna
+   ```sh
+   # Use pip
+   pip install torch wandb survey polars numpy optuna matplotlib
+
+   # Or Use uv with sync requirements.txt (recommended)
+   uv pip sync requirements.txt
+
+   # Or Use uv (fresh install)
+   uv pip install -U torch wandb survey polars numpy optuna matplotlib
    ```
 
 3. (Optional) Set up a Weights & Biases account for experiment tracking.
@@ -34,11 +42,16 @@ It includes configuration management, logging with Weights & Biases (wandb), and
 2. (Optional) Configure hyperparameter optimization by modifying `optimize_template.yaml` or creating a new YAML file based on it.
 
 3. Run the experiment:
-   ```
+   ```sh
    python main.py --run_config path/to/run_config.yaml [--optimize_config path/to/optimize_config.yaml]
    ```
 
    If `--optimize_config` is provided, the script will perform hyperparameter optimization using Optuna.
+
+4. Analyze the results:
+   ```sh
+   python analyze.py
+   ```
 
 ## Configuration
 
@@ -77,19 +90,38 @@ It includes configuration management, logging with Weights & Biases (wandb), and
 
 - Configurable experiments using YAML files
 - Integration with Weights & Biases for experiment tracking
+- Hyperparameter optimization using Optuna
 - Support for multiple random seeds
 - Flexible model architecture (currently MLP)
 - Device selection (CPU/CUDA)
 - Learning rate scheduling
-- Hyperparameter optimization using Optuna
+- Analysis tools for completed runs and optimizations
 
 ## Analysis
 
-The `util.py` file includes functions for analyzing completed runs:
+The `analyze.py` script utilizes functions from `util.py` to analyze completed runs and optimizations. Key functions include:
 
 - `select_group`: Select a run group for analysis
 - `select_seed`: Select a specific seed from a run group
+- `select_device`: Choose a device for analysis
 - `load_model`: Load a trained model and its configuration
+- `load_study`: Load an Optuna study
+- `load_best_model`: Load the best model from an optimization study
+
+These functions are defined in `util.py` and used within `analyze.py`.
+
+To use the analysis tools:
+
+1. Run the `analyze.py` script:
+   ```
+   python analyze.py
+   ```
+
+2. Follow the prompts to select the project, run group, and seed (if applicable).
+
+3. The script will load the selected model and perform basic analysis, such as calculating the validation loss.
+
+4. You can extend the `main()` function in `analyze.py` to add custom analysis as needed, utilizing the utility functions from `util.py`.
 
 ## Contributing
 
