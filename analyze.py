@@ -1,6 +1,9 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
 import matplotlib.pyplot as plt
+import scienceplots
+
 from util import select_group, select_seed, select_device, load_model, load_data, load_study, load_best_model
 
 def test_model(model, dl_val, device):
