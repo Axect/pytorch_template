@@ -4,5 +4,6 @@ data/*.parquet
 
 checkpoints/
 runs/
+runs
 wandb/
 __pycache__/
