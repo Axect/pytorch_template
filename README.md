@@ -82,9 +82,11 @@ It includes configuration management, logging with Weights & Biases (wandb), hyp
 
 ## Customization
 
-- Modify the `MLP` class in `model.py` or add new model architectures.
-- Adjust the `load_data` function in `util.py` to work with your dataset.
-- Extend the `RunConfig` and `OptimizeConfig` classes in `config.py` to include additional parameters.
+- Custom model: Modify or add models in `model.py`. Models should accept a `hparams` argument as a dictionary, with keys matching the `net_config` parameters in the run configuration YAML file.
+
+- Custom data: Modify the `load_data` function in `util.py`. The current example uses Cosine regression. The `load_data` function should return train and validation datasets compatible with PyTorch's DataLoader.
+
+- Custom training: Customize the `Trainer` class in `util.py` by modifying `step`, `train_epoch`, `val_epoch`, and `train` methods to suit your task. Ensure that `train` returns `val_loss` or a custom metric for proper hyperparameter optimization.
 
 ## Features
 
