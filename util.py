@@ -64,7 +64,7 @@ class Trainer:
         self.model.train()
         train_loss = 0
         for x, y in dl_train:
-            x = x.to(self.device).requires_grad_(True)
+            x = x.to(self.device)
             y = y.to(self.device)
             y_pred = self.step(x)
             loss = self.criterion(y_pred, y)
@@ -79,7 +79,7 @@ class Trainer:
         self.model.eval()
         val_loss = 0
         for x, y in dl_val:
-            x = x.to(self.device).requires_grad_(True)
+            x = x.to(self.device)
             y = y.to(self.device)
             y_pred = self.step(x)
             loss = self.criterion(y_pred, y)
