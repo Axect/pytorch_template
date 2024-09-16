@@ -1,15 +1,5 @@
-import torch
-from torch import nn
-from torch.optim.adam import Adam
-from torch.optim.adamw import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from hyperbolic_lr import HyperbolicLR, ExpHyperbolicLR
-import survey
-import optuna
-
-from model import MLP
-
 from dataclasses import dataclass, asdict, field
+import optuna
 import yaml
 import importlib
 
