@@ -151,6 +151,16 @@ def run(run_config: RunConfig, dl_train, dl_val, group_name=None):
 # ┌──────────────────────────────────────────────────────────┐
 #  For Analyze
 # └──────────────────────────────────────────────────────────┘
+def select_project():
+    runs_path = "runs/"
+    projects = [d for d in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, d))]
+    if not projects:
+        raise ValueError(f"No projects found in {runs_path}")
+    
+    selected_index = survey.routines.select("Select a project:", options=projects)
+    return projects[selected_index] # pyright: ignore
+
+
 def select_group(project):
     runs_path = f"runs/{project}"
     groups = [d for d in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, d))]
