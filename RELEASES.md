@@ -1,3 +1,7 @@
+# 2024-09-22
+
+- Early stop when loss becomes NaN
+
 # 2024-09-20
 
 - Add `utils.select_project`
