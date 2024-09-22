@@ -1,6 +1,7 @@
 # 2024-09-22
 
 - Early stop when loss becomes NaN
+- Fix a bug in load_best_model
 
 # 2024-09-20
 
