@@ -51,7 +51,7 @@ def main():
             return run(run_config, dl_train, dl_val, group_name)
 
         optimize_config = OptimizeConfig.from_yaml(args.optimize_config)
-        study = optimize_config.create_study(project=base_config.project)
+        study = optimize_config.create_study(project=f"{base_config.project}_Opt")
         study.optimize(lambda trial: objective(trial, base_config, optimize_config, dl_train, dl_val), n_trials=optimize_config.trials)
 
         print("Best trial:")
