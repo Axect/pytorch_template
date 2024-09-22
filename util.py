@@ -269,7 +269,7 @@ def load_best_model(project, study_name, weights_only=True):
     """
     study = load_study(project, study_name)
     best_trial = study.best_trial
-    project_name = f"{project}_Opt"
+    project_name = project
     group_name = best_trial.user_attrs['group_name']
 
     # Select Seed
