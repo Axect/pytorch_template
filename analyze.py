@@ -23,7 +23,7 @@ def test_model(model, dl_val, device):
 
 def main():
     # Test run
-    project = "PyTorch_Template"
+    project = select_project()
     #group_name = select_group(project)
     #seed = select_seed(project, group_name)
     #device = select_device()
