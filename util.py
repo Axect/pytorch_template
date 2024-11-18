@@ -187,8 +187,10 @@ def run(run_config: RunConfig, dl_train, dl_val, group_name=None):
     run_config.to_yaml(f"{group_path}/config.yaml")
 
     total_loss = 0
+    effective_seeds = 0
     for seed in seeds:
         set_seed(seed)
+        effective_seeds += 1
 
         model = run_config.create_model().to(device)
         optimizer = run_config.create_optimizer(model)
@@ -226,7 +228,7 @@ def run(run_config: RunConfig, dl_train, dl_val, group_name=None):
         if math.isinf(total_loss):
             break
 
-    return total_loss / len(seeds)
+    return total_loss / effective_seeds
 
 
 # ┌──────────────────────────────────────────────────────────┐
