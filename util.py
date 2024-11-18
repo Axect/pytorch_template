@@ -166,6 +166,10 @@ class Trainer:
                 print(
                     f"epoch: {epoch}, train_loss: {train_loss}, val_loss: {val_loss}, lr: {self.optimizer.param_groups[0]['lr']}"
                 )
+            if epoch == epochs - 1:
+                print(
+                    f"epoch: {epoch}, train_loss: {train_loss}, val_loss: {val_loss}, lr: {self.optimizer.param_groups[0]['lr']}"
+                )
         return val_loss
 
 
