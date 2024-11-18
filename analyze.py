@@ -4,7 +4,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scienceplots
 
-from util import select_project, select_group, select_seed, select_device, load_model, load_data, load_study, load_best_model
+from util import (
+    select_project,
+    select_group,
+    select_seed,
+    select_device,
+    load_model,
+    load_data,
+    load_study,
+    load_best_model,
+)
+
 
 def test_model(model, dl_val, device):
     model.eval()
@@ -21,14 +31,15 @@ def test_model(model, dl_val, device):
             all_targets.extend(y.cpu().numpy())
     return total_loss / len(dl_val), all_preds, all_targets
 
+
 def main():
     # Test run
     project = select_project()
-    #group_name = select_group(project)
-    #seed = select_seed(project, group_name)
-    #device = select_device()
-    #model, config = load_model(project, group_name, seed)
-    #model = model.to(device)
+    # group_name = select_group(project)
+    # seed = select_seed(project, group_name)
+    # device = select_device()
+    # model, config = load_model(project, group_name, seed)
+    # model = model.to(device)
 
     # Load the best model
     study_name = "Optimize_Template"
@@ -43,6 +54,7 @@ def main():
 
     # Additional custom analysis can be added here
     # ...
+
 
 if __name__ == "__main__":
     main()

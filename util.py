@@ -1,14 +1,12 @@
 import torch
-from torch import nn
 from torch.utils.data import TensorDataset
 import torch.nn.functional as F
-import polars as pl
 import numpy as np
 import survey
 import wandb
 import optuna
 
-from config import RunConfig, OptimizeConfig
+from config import RunConfig
 
 import random
 import os
@@ -24,16 +22,16 @@ def load_data(n=10000, split_ratio=0.8, seed=42):
     y = torch.cos(x * (2 * pi)) + torch.rand(n) * 0.01
 
     ics = torch.randperm(n)
-    ics_train = ics[:int(n * split_ratio)]
-    ics_val   = ics[int(n * split_ratio):]
+    ics_train = ics[: int(n * split_ratio)]
+    ics_val = ics[int(n * split_ratio) :]
 
     x_train = x[ics_train].view(-1, 1)
     y_train = y[ics_train].view(-1, 1)
-    x_val   = x[ics_val].view(-1, 1)
-    y_val   = y[ics_val].view(-1, 1)
+    x_val = x[ics_val].view(-1, 1)
+    y_val = y[ics_val].view(-1, 1)
 
-    train_ds    = TensorDataset(x_train, y_train)
-    val_ds      = TensorDataset(x_val, y_val)
+    train_ds = TensorDataset(x_train, y_train)
+    val_ds = TensorDataset(x_val, y_val)
 
     return train_ds, val_ds
 
@@ -101,13 +99,17 @@ class Trainer:
                 break
 
             self.scheduler.step()
-            wandb.log({
-                "train_loss": train_loss,
-                "val_loss": val_loss,
-                "lr": self.optimizer.param_groups[0]["lr"],
-            })
+            wandb.log(
+                {
+                    "train_loss": train_loss,
+                    "val_loss": val_loss,
+                    "lr": self.optimizer.param_groups[0]["lr"],
+                }
+            )
             if epoch % 10 == 0:
-                print(f"epoch: {epoch}, train_loss: {train_loss}, val_loss: {val_loss}, lr: {self.optimizer.param_groups[0]['lr']}")
+                print(
+                    f"epoch: {epoch}, train_loss: {train_loss}, val_loss: {val_loss}, lr: {self.optimizer.param_groups[0]['lr']}"
+                )
         return val_loss
 
 
@@ -141,7 +143,9 @@ def run(run_config: RunConfig, dl_train, dl_val, group_name=None):
             config=run_config.gen_config(),
         )
 
-        trainer = Trainer(model, optimizer, scheduler, criterion=F.mse_loss, device=device)
+        trainer = Trainer(
+            model, optimizer, scheduler, criterion=F.mse_loss, device=device
+        )
         val_loss = trainer.train(dl_train, dl_val, epochs=run_config.epochs)
         total_loss += val_loss
 
@@ -151,7 +155,7 @@ def run(run_config: RunConfig, dl_train, dl_val, group_name=None):
             os.makedirs(run_path)
         torch.save(model.state_dict(), f"{run_path}/model.pt")
 
-        wandb.finish() # pyright: ignore
+        wandb.finish()  # pyright: ignore
 
         # Early stopping when loss becomes inf
         if math.isinf(total_loss):
@@ -165,36 +169,44 @@ def run(run_config: RunConfig, dl_train, dl_val, group_name=None):
 # └──────────────────────────────────────────────────────────┘
 def select_project():
     runs_path = "runs/"
-    projects = [d for d in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, d))]
+    projects = [
+        d for d in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, d))
+    ]
     if not projects:
         raise ValueError(f"No projects found in {runs_path}")
-    
+
     selected_index = survey.routines.select("Select a project:", options=projects)
-    return projects[selected_index] # pyright: ignore
+    return projects[selected_index]  # pyright: ignore
 
 
 def select_group(project):
     runs_path = f"runs/{project}"
-    groups = [d for d in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, d))]
+    groups = [
+        d for d in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, d))
+    ]
     if not groups:
         raise ValueError(f"No run groups found in {runs_path}")
-    
+
     selected_index = survey.routines.select("Select a run group:", options=groups)
-    return groups[selected_index] # pyright: ignore
+    return groups[selected_index]  # pyright: ignore
+
 
 def select_seed(project, group_name):
     group_path = f"runs/{project}/{group_name}"
-    seeds = [d for d in os.listdir(group_path) if os.path.isdir(os.path.join(group_path, d))]
+    seeds = [
+        d for d in os.listdir(group_path) if os.path.isdir(os.path.join(group_path, d))
+    ]
     if not seeds:
         raise ValueError(f"No seeds found in {group_path}")
-    
+
     selected_index = survey.routines.select("Select a seed:", options=seeds)
-    return seeds[selected_index] # pyright: ignore
+    return seeds[selected_index]  # pyright: ignore
+
 
 def select_device():
-    devices = ['cpu'] + [f'cuda:{i}' for i in range(torch.cuda.device_count())]
+    devices = ["cpu"] + [f"cuda:{i}" for i in range(torch.cuda.device_count())]
     selected_index = survey.routines.select("Select a device:", options=devices)
-    return devices[selected_index] # pyright: ignore
+    return devices[selected_index]  # pyright: ignore
 
 
 def load_model(project, group_name, seed, weights_only=True):
@@ -205,7 +217,7 @@ def load_model(project, group_name, seed, weights_only=True):
         project (str): The name of the project.
         group_name (str): The name of the run group.
         seed (str): The seed of the specific run.
-        weights_only (bool, optional): If True, only load the model weights without loading the entire pickle file. 
+        weights_only (bool, optional): If True, only load the model weights without loading the entire pickle file.
                                        This can be faster and use less memory. Defaults to True.
 
     Returns:
@@ -217,25 +229,27 @@ def load_model(project, group_name, seed, weights_only=True):
     Example usage:
         # Load full model
         model, config = load_model("MyProject", "experiment1", "seed42")
-        
+
         # Load only weights (faster and uses less memory)
         model, config = load_model("MyProject", "experiment1", "seed42", weights_only=True)
     """
     config_path = f"runs/{project}/{group_name}/config.yaml"
     model_path = f"runs/{project}/{group_name}/{seed}/model.pt"
-    
+
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Config file not found for {project}/{group_name}")
     if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model file not found for {project}/{group_name}/{seed}")
-    
+        raise FileNotFoundError(
+            f"Model file not found for {project}/{group_name}/{seed}"
+        )
+
     config = RunConfig.from_yaml(config_path)
     model = config.create_model()
 
     # Use weights_only option in torch.load
-    state_dict = torch.load(model_path, map_location='cpu', weights_only=weights_only)
+    state_dict = torch.load(model_path, map_location="cpu", weights_only=weights_only)
     model.load_state_dict(state_dict)
-    
+
     return model, config
 
 
@@ -250,10 +264,7 @@ def load_study(project, study_name):
     Returns:
         optuna.Study: The loaded study object.
     """
-    study = optuna.load_study(
-        study_name=study_name,
-        storage=f'sqlite:///{project}.db'
-    )
+    study = optuna.load_study(study_name=study_name, storage=f"sqlite:///{project}.db")
     return study
 
 
@@ -271,10 +282,12 @@ def load_best_model(project, study_name, weights_only=True):
     study = load_study(project, study_name)
     best_trial = study.best_trial
     project_name = project
-    group_name = best_trial.user_attrs['group_name']
+    group_name = best_trial.user_attrs["group_name"]
 
     # Select Seed
     seed = select_seed(project_name, group_name)
-    best_model, best_config = load_model(project_name, group_name, seed, weights_only=weights_only)
+    best_model, best_config = load_model(
+        project_name, group_name, seed, weights_only=weights_only
+    )
 
     return best_model, best_config

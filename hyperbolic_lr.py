@@ -1,5 +1,6 @@
 import math
 
+
 class HyperbolicLR:
     """
     HyperbolicLR
@@ -11,8 +12,9 @@ class HyperbolicLR:
         init_lr: Initial learning rate
         infimum_lr: The infimum of the hyperbolic learning rate
     """
+
     def __init__(self, optimizer, upper_bound=1000, max_iter=100, infimum_lr=1e-6):
-        init_lr = optimizer.param_groups[0]['lr']
+        init_lr = optimizer.param_groups[0]["lr"]
         if upper_bound < max_iter:
             raise ValueError("upper_bound must be greater than max_iter")
         elif infimum_lr >= init_lr:
@@ -40,7 +42,7 @@ class HyperbolicLR:
         """
         Get the last learning rates from the inner optimizer
         """
-        return [param_group['lr'] for param_group in self._optimizer.param_groups]
+        return [param_group["lr"] for param_group in self._optimizer.param_groups]
 
     def _get_lr(self):
         """
@@ -60,7 +62,7 @@ class HyperbolicLR:
         self.iter += 1
         lr = self._get_lr()
         for param_group in self._optimizer.param_groups:
-            param_group['lr'] = lr
+            param_group["lr"] = lr
 
 
 class ExpHyperbolicLR:
@@ -74,8 +76,9 @@ class ExpHyperbolicLR:
         init_lr: Initial learning rate
         infimum_lr: The infimum of the hyperbolic learning rate
     """
+
     def __init__(self, optimizer, upper_bound=1000, max_iter=100, infimum_lr=1e-6):
-        init_lr = optimizer.param_groups[0]['lr']
+        init_lr = optimizer.param_groups[0]["lr"]
         if upper_bound < max_iter:
             raise ValueError("upper_bound must be greater than max_iter")
         elif infimum_lr >= init_lr:
@@ -103,7 +106,7 @@ class ExpHyperbolicLR:
         """
         Get the last learning rates from the inner optimizer
         """
-        return [param_group['lr'] for param_group in self._optimizer.param_groups]
+        return [param_group["lr"] for param_group in self._optimizer.param_groups]
 
     def _get_lr(self):
         """
@@ -123,4 +126,4 @@ class ExpHyperbolicLR:
         self.iter += 1
         lr = self._get_lr()
         for param_group in self._optimizer.param_groups:
-            param_group['lr'] = lr
+            param_group["lr"] = lr
