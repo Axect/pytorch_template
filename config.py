@@ -5,6 +5,14 @@ import importlib
 
 
 @dataclass
+class EarlyStoppingConfig:
+    enabled: bool = False
+    patience: int = 10
+    mode: str = "min"  # "min" or "max"
+    min_delta: float = 0.0001
+
+
+@dataclass
 class RunConfig:
     project: str
     device: str
@@ -17,6 +25,15 @@ class RunConfig:
     net_config: dict[str, int]
     optimizer_config: dict[str, int | float]
     scheduler_config: dict[str, int | float]
+    early_stopping_config: EarlyStoppingConfig = field(
+        default_factory=lambda: EarlyStoppingConfig()
+    )
+
+    def __post_init__(self):
+        if isinstance(self.early_stopping_config, dict):
+            self.early_stopping_config = EarlyStoppingConfig(
+                **self.early_stopping_config
+            )
 
     @classmethod
     def from_yaml(cls, path: str):

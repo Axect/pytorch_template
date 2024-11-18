@@ -48,13 +48,63 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
+class EarlyStopping:
+    def __init__(self, patience=10, mode="min", min_delta=0):
+        self.patience = patience
+        self.mode = mode
+        self.min_delta = min_delta
+        self.counter = 0
+        self.best_loss = None
+        self.early_stop = False
+
+    def __call__(self, val_loss):
+        if self.best_loss is None:
+            self.best_loss = val_loss
+            return False
+
+        if self.mode == "min":
+            if val_loss <= self.best_loss - self.min_delta:
+                self.best_loss = val_loss
+                self.counter = 0
+            else:
+                self.counter += 1
+        else:  # mode == "max"
+            if val_loss >= self.best_loss + self.min_delta:
+                self.best_loss = val_loss
+                self.counter = 0
+            else:
+                self.counter += 1
+
+        if self.counter >= self.patience:
+            self.early_stop = True
+            return True
+        return False
+
+
 class Trainer:
-    def __init__(self, model, optimizer, scheduler, criterion, device="cpu"):
+    def __init__(
+        self,
+        model,
+        optimizer,
+        scheduler,
+        criterion,
+        early_stopping_config=None,
+        device="cpu",
+    ):
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
         self.device = device
+
+        if early_stopping_config and early_stopping_config.enabled:
+            self.early_stopping = EarlyStopping(
+                patience=early_stopping_config.patience,
+                mode=early_stopping_config.mode,
+                min_delta=early_stopping_config.min_delta,
+            )
+        else:
+            self.early_stopping = None
 
     def step(self, x):
         return self.model(x)
@@ -97,6 +147,12 @@ class Trainer:
                 print("Early stopping due to NaN loss")
                 val_loss = math.inf
                 break
+
+            # Early stopping check
+            if self.early_stopping is not None:
+                if self.early_stopping(val_loss):
+                    print(f"Early stopping triggered at epoch {epoch}")
+                    break
 
             self.scheduler.step()
             wandb.log(
@@ -144,7 +200,12 @@ def run(run_config: RunConfig, dl_train, dl_val, group_name=None):
         )
 
         trainer = Trainer(
-            model, optimizer, scheduler, criterion=F.mse_loss, device=device
+            model,
+            optimizer,
+            scheduler,
+            criterion=F.mse_loss,
+            early_stopping_config=run_config.early_stopping_config,
+            device=device,
         )
         val_loss = trainer.train(dl_train, dl_val, epochs=run_config.epochs)
         total_loss += val_loss

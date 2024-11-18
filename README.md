@@ -9,8 +9,8 @@ It includes configuration management, logging with Weights & Biases (wandb), hyp
 - `main.py`: The entry point of the project, handling command-line arguments and experiment execution.
 - `model.py`: Contains the model architecture (currently an MLP).
 - `util.py`: Utility functions for data loading, device selection, training, and analysis.
-- `run_template.yaml`: Template for run configuration.
-- `optimize_template.yaml`: Template for optimization configuration.
+- `configs/run_template.yaml`: Template for run configuration.
+- `configs/optimize_template.yaml`: Template for optimization configuration.
 - `analyze.py`: Script for analyzing completed runs and optimizations, utilizing functions from `util.py`.
 
 ## Setup
@@ -37,9 +37,9 @@ It includes configuration management, logging with Weights & Biases (wandb), hyp
 
 ## Usage
 
-1. Configure your experiment by modifying `run_template.yaml` or creating a new YAML file based on it.
+1. Configure your experiment by modifying `configs/run_template.yaml` or creating a new YAML file based on it.
 
-2. (Optional) Configure hyperparameter optimization by modifying `optimize_template.yaml` or creating a new YAML file based on it.
+2. (Optional) Configure hyperparameter optimization by modifying `configs/optimize_template.yaml` or creating a new YAML file based on it.
 
 3. Run the experiment:
    ```sh
