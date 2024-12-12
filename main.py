@@ -24,8 +24,8 @@ def main():
 
     # Load data
     ds_train, ds_val = load_data()  # pyright: ignore
-    dl_train = DataLoader(ds_train, batch_size=base_config.batch_size, shuffle=True)
-    dl_val = DataLoader(ds_val, batch_size=base_config.batch_size)
+    dl_train = DataLoader(ds_train, batch_size=base_config.batch_size, shuffle=True, num_workers=4, pin_memory=True)
+    dl_val = DataLoader(ds_val, batch_size=base_config.batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
     # Run
     if args.optimize_config:
