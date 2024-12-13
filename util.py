@@ -90,12 +90,14 @@ class Trainer:
         criterion,
         early_stopping_config=None,
         device="cpu",
+        trial=None,
     ):
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
         self.device = device
+        self.trial = trial
 
         if early_stopping_config and early_stopping_config.enabled:
             self.early_stopping = EarlyStopping(
@@ -154,6 +156,12 @@ class Trainer:
                     print(f"Early stopping triggered at epoch {epoch}")
                     break
 
+            # Pruning check
+            if self.trial is not None:
+                self.trial.report(val_loss, step=epoch)
+                if self.trial.should_prune():
+                    raise optuna.TrialPruned()
+
             self.scheduler.step()
             wandb.log(
                 {
@@ -173,7 +181,7 @@ class Trainer:
         return val_loss
 
 
-def run(run_config: RunConfig, dl_train, dl_val, group_name=None):
+def run(run_config: RunConfig, dl_train, dl_val, group_name=None, trial=None):
     project = run_config.project
     device = run_config.device
     seeds = run_config.seeds
@@ -212,9 +220,13 @@ def run(run_config: RunConfig, dl_train, dl_val, group_name=None):
             criterion=F.mse_loss,
             early_stopping_config=run_config.early_stopping_config,
             device=device,
+            trial=trial,
         )
-        val_loss = trainer.train(dl_train, dl_val, epochs=run_config.epochs)
-        total_loss += val_loss
+        try:
+            val_loss = trainer.train(dl_train, dl_val, epochs=run_config.epochs)
+            total_loss += val_loss
+        except optuna.TrialPruned:
+            raise
 
         # Save model & configs
         run_path = f"{group_path}/{run_name}"
