@@ -1,3 +1,10 @@
+# 2024-12-16
+
+- Add PFL (Predicted Final Loss) Pruner and its documentation
+  - Add PFL Pruner to optimize hyperparameter search
+  - Update default optimization template with PFL Pruner configuration
+  - Add Pruner documentation in README.md under Appendix section
+
 # 2024-09-22
 
 - Early stop when loss becomes NaN

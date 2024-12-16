@@ -77,7 +77,7 @@ It includes configuration management, logging with Weights & Biases (wandb), hyp
 - `metric`: Metric to optimize
 - `direction`: Direction of optimization ('minimize' or 'maximize')
 - `sampler`: Optuna sampler configuration
-- `pruner`: (Optional) Optuna pruner configuration
+- `pruner`: (Optional) Pruner configuration
 - `search_space`: Definition of the hyperparameter search space
 
 ## Customization
@@ -143,3 +143,46 @@ When using this template for your own project, please remember to:
 2. Ensure all dependencies and libraries used in your project comply with their respective licenses.
 
 For more information on choosing a license, visit [choosealicense.com](https://choosealicense.com/).
+
+## Appendix
+
+<details>
+<summary><strong>PFL (Predicted Final Loss) Pruner</strong></summary>
+
+### Overview
+The PFL pruner is a custom pruner that helps optimize hyperparameter search by early stopping unpromising trials. It maintains top k trials based on validation loss and prunes trials if their predicted final loss is worse than the worst saved PFL.
+
+### Key Features
+- Maintains top k trials based on validation loss
+- Predicts final loss using loss history
+- Supports multiple random seeds
+- Compatible with Optuna's pruning interface
+
+### Configuration
+In your `optimize_template.yaml`, configure the pruner under the `pruner` section:
+
+```yaml
+pruner:
+  name: pruner.PFLPruner
+  kwargs:
+    n_startup_trials: 10    # Number of trials to run before pruning starts
+    n_warmup_epochs: 10     # Number of epochs to run before pruning can occur
+    top_k: 10              # Number of best trials to maintain
+    target_epoch: 50       # Target epoch for final loss prediction
+```
+
+### Parameters
+- `n_startup_trials`: Number of trials to run before pruning starts
+- `n_warmup_epochs`: Number of epochs to wait before pruning can occur within each trial
+- `top_k`: Number of best trials to maintain for comparison
+- `target_epoch`: Target epoch number used for final loss prediction
+
+### How It Works
+1. For the first `n_startup_trials`, all trials run without pruning
+2. Within each trial, no pruning occurs during the first `n_warmup_epochs`
+3. After warmup:
+   - The pruner maintains a list of top k trials based on validation loss
+   - For each trial, it predicts the final loss using the loss history
+   - If a trial's predicted final loss is worse than all saved trials, it is pruned
+
+</details>
