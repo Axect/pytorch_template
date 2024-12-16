@@ -29,6 +29,8 @@ def main():
 
     # Run
     if args.optimize_config:
+        optimize_config = OptimizeConfig.from_yaml(args.optimize_config)
+        pruner = optimize_config.create_pruner()
 
         def objective(trial, base_config, optimize_config, dl_train, dl_val):
             params = optimize_config.suggest_params(trial)
@@ -44,9 +46,8 @@ def main():
 
             trial.set_user_attr("group_name", group_name)
 
-            return run(run_config, dl_train, dl_val, group_name, trial=trial)
+            return run(run_config, dl_train, dl_val, group_name, trial=trial, pruner=pruner)
 
-        optimize_config = OptimizeConfig.from_yaml(args.optimize_config)
         study = optimize_config.create_study(project=f"{base_config.project}_Opt")
         study.optimize(
             lambda trial: objective(

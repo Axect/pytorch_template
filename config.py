@@ -141,7 +141,7 @@ class OptimizeConfig:
             sampler_kwargs["search_space"] = self.grid_search_space()
         return sampler_class(**sampler_kwargs)
 
-    def _create_pruner(self):
+    def create_pruner(self):
         if not self.pruner:
             return None
         module_name, class_name = self.pruner["name"].rsplit(".", 1)
