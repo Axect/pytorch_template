@@ -159,9 +159,6 @@ class OptimizeConfig:
             "direction": self.direction,
             "load_if_exists": True,
         }
-        pruner = self._create_pruner()
-        if pruner:
-            study["pruner"] = pruner
         return optuna.create_study(**study)
 
     def suggest_params(self, trial):
