@@ -81,6 +81,31 @@ class EarlyStopping:
         return False
 
 
+def predict_final_loss(losses, max_epochs):
+    if len(losses) < 10:
+        return -np.log10(losses[-1])
+    try:
+        # Convert to numpy array
+        y = np.array(losses)
+        t = np.arange(len(y))
+
+        # 첫번째 값 기준으로 decay fitting
+        y_transformed = np.log(y)
+        K, log_A = np.polyfit(t, y_transformed, 1)
+        A = np.exp(log_A)
+
+        # Predict final loss
+        predicted_loss = -np.log10(A * np.exp(K * max_epochs))
+
+        if np.isfinite(predicted_loss):
+            return predicted_loss
+
+    except Exception as e:
+        print(f"Error in loss prediction: {e}")
+
+    return -np.log10(losses[-1])
+
+
 class Trainer:
     def __init__(
         self,
@@ -91,6 +116,8 @@ class Trainer:
         early_stopping_config=None,
         device="cpu",
         trial=None,
+        seed=None,
+        pruner=None,
     ):
         self.model = model
         self.optimizer = optimizer
@@ -98,6 +125,8 @@ class Trainer:
         self.criterion = criterion
         self.device = device
         self.trial = trial
+        self.seed = seed
+        self.pruner = pruner
 
         if early_stopping_config and early_stopping_config.enabled:
             self.early_stopping = EarlyStopping(
@@ -140,9 +169,12 @@ class Trainer:
 
     def train(self, dl_train, dl_val, epochs):
         val_loss = 0
+        val_losses = []
+
         for epoch in range(epochs):
             train_loss = self.train_epoch(dl_train)
             val_loss = self.val_epoch(dl_val)
+            val_losses.append(val_loss)
 
             # Early stopping if loss becomes NaN
             if math.isnan(train_loss) or math.isnan(val_loss):
@@ -156,32 +188,46 @@ class Trainer:
                     print(f"Early stopping triggered at epoch {epoch}")
                     break
 
+            log_dict = {
+                "train_loss": train_loss,
+                "val_loss": val_loss,
+                "lr": self.optimizer.param_groups[0]["lr"],
+            }
+
+            if epoch >= 10:
+                log_dict["predicted_final_loss"] = predict_final_loss(
+                    val_losses, epochs
+                )
+
             # Pruning check
-            if self.trial is not None:
-                self.trial.report(val_loss, step=epoch)
-                if self.trial.should_prune():
+            if (
+                self.pruner is not None
+                and self.trial is not None
+                and self.seed is not None
+            ):
+                self.pruner.report(
+                    trial_id=self.trial.number,
+                    seed=self.seed,
+                    epoch=epoch,
+                    value=val_loss,
+                )
+                if self.pruner.should_prune():
                     raise optuna.TrialPruned()
 
             self.scheduler.step()
-            wandb.log(
-                {
-                    "train_loss": train_loss,
-                    "val_loss": val_loss,
-                    "lr": self.optimizer.param_groups[0]["lr"],
-                }
-            )
-            if epoch % 10 == 0:
-                print(
-                    f"epoch: {epoch}, train_loss: {train_loss}, val_loss: {val_loss}, lr: {self.optimizer.param_groups[0]['lr']}"
-                )
-            if epoch == epochs - 1:
-                print(
-                    f"epoch: {epoch}, train_loss: {train_loss}, val_loss: {val_loss}, lr: {self.optimizer.param_groups[0]['lr']}"
-                )
+            wandb.log(log_dict)
+            if epoch % 10 == 0 or epoch == epochs - 1:
+                print_str = f"epoch: {epoch}"
+                for key, value in log_dict.items():
+                    print_str += f", {key}: {value:.4e}"
+                print(print_str)
+
         return val_loss
 
 
-def run(run_config: RunConfig, dl_train, dl_val, group_name=None, trial=None):
+def run(
+    run_config: RunConfig, dl_train, dl_val, group_name=None, trial=None, pruner=None
+):
     project = run_config.project
     device = run_config.device
     seeds = run_config.seeds
@@ -194,53 +240,70 @@ def run(run_config: RunConfig, dl_train, dl_val, group_name=None, trial=None):
         os.makedirs(group_path)
     run_config.to_yaml(f"{group_path}/config.yaml")
 
+    # Register trial at the beginning if pruner exists
+    if pruner is not None and trial is not None and hasattr(pruner, "register_trial"):
+        pruner.register_trial(trial.number)
+
     total_loss = 0
-    effective_seeds = 0
-    for seed in seeds:
-        set_seed(seed)
-        effective_seeds += 1
+    complete_seeds = 0
+    try:
+        for seed in seeds:
+            set_seed(seed)
 
-        model = run_config.create_model().to(device)
-        optimizer = run_config.create_optimizer(model)
-        scheduler = run_config.create_scheduler(optimizer)
+            model = run_config.create_model().to(device)
+            optimizer = run_config.create_optimizer(model)
+            scheduler = run_config.create_scheduler(optimizer)
 
-        run_name = f"{seed}"
-        wandb.init(
-            project=project,
-            name=run_name,
-            group=group_name,
-            tags=tags,
-            config=run_config.gen_config(),
-        )
+            run_name = f"{seed}"
+            wandb.init(
+                project=project,
+                name=run_name,
+                group=group_name,
+                tags=tags,
+                config=run_config.gen_config(),
+            )
 
-        trainer = Trainer(
-            model,
-            optimizer,
-            scheduler,
-            criterion=F.mse_loss,
-            early_stopping_config=run_config.early_stopping_config,
-            device=device,
-            trial=trial,
-        )
-        try:
+            trainer = Trainer(
+                model,
+                optimizer,
+                scheduler,
+                criterion=F.mse_loss,
+                early_stopping_config=run_config.early_stopping_config,
+                device=device,
+                trial=trial,
+                seed=seed,
+                pruner=pruner,
+            )
+
             val_loss = trainer.train(dl_train, dl_val, epochs=run_config.epochs)
             total_loss += val_loss
-        except optuna.TrialPruned:
-            raise
+            complete_seeds += 1
 
-        # Save model & configs
-        run_path = f"{group_path}/{run_name}"
-        if not os.path.exists(run_path):
-            os.makedirs(run_path)
-        torch.save(model.state_dict(), f"{run_path}/model.pt")
+            # Save model & configs
+            run_path = f"{group_path}/{run_name}"
+            if not os.path.exists(run_path):
+                os.makedirs(run_path)
+            torch.save(model.state_dict(), f"{run_path}/model.pt")
 
-        wandb.finish()  # pyright: ignore
+            wandb.finish()
 
-        # Early stopping when loss becomes inf
-        if math.isinf(total_loss):
-            break
+            # Early stopping if loss becomes inf
+            if math.isinf(val_loss):
+                break
 
-    return total_loss / effective_seeds
+    except optuna.TrialPruned:
+        wandb.finish()
+        raise
+    finally:
+        # Call trial_finished only once after all seeds are done
+        if (
+            pruner is not None
+            and trial is not None
+            and hasattr(pruner, "complete_trial")
+        ):
+            pruner.complete_trial(trial.number)
+
+    return total_loss / (complete_seeds if complete_seeds > 0 else 1)
 
 
 # ┌──────────────────────────────────────────────────────────┐
