@@ -2,7 +2,7 @@ project: PyTorch_Template
 device: cuda:0
 net: model.MLP
 optimizer: torch.optim.adamw.AdamW
-scheduler: hyperbolic_lr.HyperbolicLR
+scheduler: hyperbolic_lr.ExpHyperbolicLR
 epochs: 50
 batch_size: 256
 seeds: [89, 231, 928, 814, 269]
@@ -16,7 +16,7 @@ scheduler_config:
   max_iter: 50
   infimum_lr: 1.e-5
 early_stopping_config:
-  enabled: true
+  enabled: false
   patience: 10
   mode: min # 'min' or 'max'
   min_delta: 0.0001 # Percent
