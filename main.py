@@ -46,7 +46,9 @@ def main():
 
             trial.set_user_attr("group_name", group_name)
 
-            return run(run_config, dl_train, dl_val, group_name, trial=trial, pruner=pruner)
+            return run(
+                run_config, dl_train, dl_val, group_name, trial=trial, pruner=pruner
+            )
 
         study = optimize_config.create_study(project=f"{base_config.project}_Opt")
         study.optimize(

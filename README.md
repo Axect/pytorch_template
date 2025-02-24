@@ -24,13 +24,13 @@ It includes configuration management, logging with Weights & Biases (wandb), hyp
 2. Install the required packages:
    ```sh
    # Use pip
-   pip install torch wandb survey polars numpy optuna matplotlib scienceplots
+   pip install torch wandb rich beaupy polars numpy optuna matplotlib scienceplots
 
    # Or Use uv with sync requirements.txt (recommended)
    uv pip sync requirements.txt
 
    # Or Use uv (fresh install)
-   uv pip install -U torch wandb survey polars numpy optuna matplotlib scienceplots
+   uv pip install -U torch wandb rich beaupy polars numpy optuna matplotlib scienceplots
    ```
 
 3. (Optional) Set up a Weights & Biases account for experiment tracking.

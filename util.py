@@ -2,7 +2,8 @@ import torch
 from torch.utils.data import TensorDataset
 import torch.nn.functional as F
 import numpy as np
-import survey
+import beaupy
+from rich.console import Console
 import wandb
 import optuna
 
@@ -317,8 +318,8 @@ def select_project():
     if not projects:
         raise ValueError(f"No projects found in {runs_path}")
 
-    selected_index = survey.routines.select("Select a project:", options=projects)
-    return projects[selected_index]  # pyright: ignore
+    selected_project = beaupy.select(projects)
+    return selected_project
 
 
 def select_group(project):
@@ -329,8 +330,8 @@ def select_group(project):
     if not groups:
         raise ValueError(f"No run groups found in {runs_path}")
 
-    selected_index = survey.routines.select("Select a run group:", options=groups)
-    return groups[selected_index]  # pyright: ignore
+    selected_group = beaupy.select(groups)
+    return selected_group
 
 
 def select_seed(project, group_name):
@@ -341,14 +342,14 @@ def select_seed(project, group_name):
     if not seeds:
         raise ValueError(f"No seeds found in {group_path}")
 
-    selected_index = survey.routines.select("Select a seed:", options=seeds)
-    return seeds[selected_index]  # pyright: ignore
+    selected_seed = beaupy.select(seeds)
+    return selected_seed
 
 
 def select_device():
     devices = ["cpu"] + [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-    selected_index = survey.routines.select("Select a device:", options=devices)
-    return devices[selected_index]  # pyright: ignore
+    selected_device = beaupy.select(devices)
+    return selected_device
 
 
 def load_model(project, group_name, seed, weights_only=True):

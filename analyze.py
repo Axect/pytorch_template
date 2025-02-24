@@ -3,6 +3,8 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 import scienceplots
+import beaupy
+from rich.console import Console
 
 from util import (
     select_project,
@@ -34,18 +36,23 @@ def test_model(model, dl_val, device):
 
 def main():
     # Test run
+    console.print("[bold green]Analyzing the model...[/bold green]")
+    console.print("Select a project to analyze:")
     project = select_project()
-    # group_name = select_group(project)
-    # seed = select_seed(project, group_name)
-    # device = select_device()
-    # model, config = load_model(project, group_name, seed)
-    # model = model.to(device)
+    console.print("Select a group to analyze:")
+    group_name = select_group(project)
+    console.print("Select a seed to analyze:")
+    seed = select_seed(project, group_name)
+    console.print("Select a device:")
+    device = select_device()
+    model, config = load_model(project, group_name, seed)
+    model = model.to(device)
 
     # Load the best model
-    study_name = "Optimize_Template"
-    model, config = load_best_model(project, study_name)
-    device = select_device()
-    model = model.to(device)
+    # study_name = "Optimize_Template"
+    # model, config = load_best_model(project, study_name)
+    # device = select_device()
+    # model = model.to(device)
 
     _, dl_val = load_data()  # Assuming this is implemented in util.py
 
@@ -57,4 +64,5 @@ def main():
 
 
 if __name__ == "__main__":
+    console = Console()
     main()
