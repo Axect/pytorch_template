@@ -1,3 +1,7 @@
+# 2025-04-14
+
+- Change metric of pruner: `val_loss` -> `train_loss`
+
 # 2024-12-16
 
 - Add PFL (Predicted Final Loss) Pruner and its documentation
