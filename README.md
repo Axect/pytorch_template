@@ -74,12 +74,15 @@ It includes configuration management using YAML files, logging with Weights & Bi
 2.  **Install dependencies:**
     It's recommended to use a virtual environment.
     ```sh
-    # Create and activate a virtual environment (example using venv)
-    python -m venv venv
-    source venv/bin/activate # On Windows use `venv\Scripts\activate`
+    # Create and activate a virtual environment (example using uv)
+    uv venv
+    source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
 
     # Use uv (recommended)
-    uv pip install -r requirements.txt
+    uv pip sync requirements.txt
+
+    # Or use uv but install manually
+    uv pip install -U torch wandb rich beaupy polars numpy optuna matplotlib scienceplots
 
     # Or use pip
     pip install -r requirements.txt

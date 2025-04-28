@@ -75,12 +75,15 @@ YAML 파일을 이용한 설정 관리, Weights & Biases (wandb)를 사용한 �
 2.  **의존성 설치:**
     가상 환경 사용을 권장합니다.
     ```sh
-    # 가상 환경 생성 및 활성화 (venv 사용 예시)
-    python -m venv venv
-    source venv/bin/activate # Windows에서는 `venv\Scripts\activate` 사용
+    # 가상 환경 생성 및 활성화 (uv 사용 예시)
+    uv venv
+    source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
 
     # uv 사용 (권장)
-    uv pip install -r requirements.txt
+    uv pip sync requirements.txt
+
+    # 또는 uv 사용시 직접 설치 (권장)
+    uv pip install -U torch wandb rich beaupy polars numpy optuna matplotlib scienceplots
 
     # 또는 pip 사용
     pip install -r requirements.txt
