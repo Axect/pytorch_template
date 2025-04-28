@@ -114,7 +114,7 @@ sequenceDiagram
         Trainer->>Trainer: Calculate loss(y_pred, y)
         Trainer->>+OptimizerScheduler: Backpropagate loss & Update weights (optimizer.step())
         OptimizerScheduler-->>-Trainer: Weights updated
-        Trainer->>-DataLoaderTrain: Repeat for all batches in dl_train
+        Trainer->>DataLoaderTrain: Repeat for all batches in dl_train
         Trainer-->>-Trainer: Return average train_loss for epoch
 
         Trainer->>+Trainer: val_epoch(dl_val) # Ask Trainer to validate
@@ -123,7 +123,7 @@ sequenceDiagram
         Trainer->>+Model: Forward pass: model(x) (No gradient tracking)
         Model-->>-Trainer: Return prediction y_pred
         Trainer->>Trainer: Calculate loss(y_pred, y)
-        Trainer->>-DataLoaderVal: Repeat for all batches in dl_val
+        Trainer->>DataLoaderVal: Repeat for all batches in dl_val
         Trainer-->>-Trainer: Return average val_loss for epoch
 
         Trainer->>+LoggerEarlyStop: Log metrics (train_loss, val_loss, lr)
@@ -141,7 +141,6 @@ sequenceDiagram
     alt Training Finished Normally or Early Stopped
         Trainer-->>-RunFunc: Return final_val_loss
     end
-end
 ```
 
 This diagram shows the cycle: for each epoch, the `Trainer` calls `train_epoch` (which iterates through training batches, performs forward/backward passes, and updates weights) and `val_epoch` (which iterates through validation batches and calculates loss without updating weights). After each epoch, it logs metrics, checks for early stopping, and adjusts the learning rate.

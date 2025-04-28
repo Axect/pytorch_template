@@ -103,30 +103,33 @@ sequenceDiagram
     loop For each Epoch (within trainer.train)
         Trainer->>Trainer: Run train_epoch()
         Trainer->>Trainer: Run val_epoch()
-        Trainer->>+PFLPruner: pruner.report(trial_id=N, epoch=E, value=val_loss)
+        Trainer->>+PFLPruner: pruner.report(trial_id=N, epoch=E, value=val_loss) # PFLPruner 활성화 시작
         PFLPruner->>+TrialState: Update loss history for Trial N
         TrialState-->>-PFLPruner: Done
         PFLPruner->>PFLPruner: Calculate Predicted Final Loss (PFL)
         PFLPruner->>PFLPruner: Compare PFL with Top-K finished trials
-        PFLPruner->>+PFLPruner: pruner.should_prune() ?
+        PFLPruner->>PFLPruner: Check if should_prune() is True?
         alt Pruning conditions met
+            # report 호출에 대한 응답으로 True 반환하며 PFLPruner 비활성화
             PFLPruner-->>-Trainer: Return True
             Trainer->>Trainer: Raise optuna.TrialPruned exception
-            Trainer-->>-ObjectiveFunc: Exception caught
-            ObjectiveFunc-->>-OptunaStudy: Report Trial N as Pruned
+            Trainer-->>-ObjectiveFunc: Exception caught # Trainer 비활성화
+            ObjectiveFunc-->>-OptunaStudy: Report Trial N as Pruned # ObjectiveFunc 비활성화
+            # 여기서 루프가 중단될 수 있음 (break 등 명시적 표현은 Mermaid 표준에 없음)
         else Pruning conditions NOT met
+            # report 호출에 대한 응답으로 False 반환하며 PFLPruner 비활성화
             PFLPruner-->>-Trainer: Return False
             Trainer->>Trainer: Continue to next epoch...
         end
     end
-    alt Trial Finishes Normally (or Early Stopping)
+    alt Trial Finishes Normally (or Early Stopping outside pruning)
+        # 루프 종료 후 Trainer 비활성화 (정상 종료 또는 Early Stopping)
         Trainer-->>-ObjectiveFunc: Return final_val_loss
         ObjectiveFunc->>+PFLPruner: pruner.complete_trial(trial_id=N)
         PFLPruner->>PFLPruner: Update Top-K completed trials if necessary
-        PFLPruner-->>-ObjectiveFunc: Done
-        ObjectiveFunc-->>-OptunaStudy: Report Trial N result (final_val_loss)
+        PFLPruner-->>-ObjectiveFunc: Done # PFLPruner 비활성화
+        ObjectiveFunc-->>-OptunaStudy: Report Trial N result (final_val_loss) # ObjectiveFunc 비활성화
     end
-end
 ```
 
 1.  **Setup:** When `main.py` sets up the Optuna study ([Chapter 5]), it also creates the `PFLPruner` instance based on the `optimize_config.yaml`. This pruner instance is passed down through the `objective` function to the `util.run` function, and finally to the `Trainer` when it's initialized for a specific trial.
