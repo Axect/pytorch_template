@@ -67,7 +67,7 @@ It includes configuration management using YAML files, logging with Weights & Bi
     - Click "Create repository from template".
     - You now have a new repository in your account with a copy of this template's files. Clone *your* new repository to your local machine:
       ```sh
-      git clone [https://github.com/](https://github.com/)<your-username>/<your-new-repository-name>.git
+      git clone https://github.com/<your-username>/<your-new-repository-name>
       cd <your-new-repository-name>
       ```
 

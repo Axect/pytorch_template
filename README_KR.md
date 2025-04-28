@@ -68,7 +68,7 @@ YAML 파일을 이용한 설정 관리, Weights & Biases (wandb)를 사용한 �
     -   "Create repository from template"을 클릭합니다.
     -   이제 당신의 계정에 이 템플릿 파일들의 복사본을 가진 새로운 저장소가 생성되었습니다. *당신의* 새 저장소를 로컬 컴퓨터에 복제(clone)하세요:
       ```sh
-      git clone [https://github.com/](https://github.com/)<your-username>/<your-new-repository-name>.git
+      git clone https://github.com/<your-username>/<your-new-repository-name>
       cd <your-new-repository-name>
       ```
 
