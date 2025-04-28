@@ -5,23 +5,23 @@ It helps structure your code for *training models*, automatically finding the be
 Everything is managed through simple **configuration files** (YAML), making experiments easy to define, reproduce, and modify.
 
 
-**Source Repository:** [None](None)
+**Source Repository:** [pytorch_template](https://github.com/Axect/pytorch_template)
 
 ```mermaid
 flowchart TD
-    A0["Configuration Management (`RunConfig` / `OptimizeConfig`)
+    A0["Configuration Management (RunConfig / OptimizeConfig)
 "]
-    A1["Experiment Execution Orchestration (`main.py`)
+    A1["Experiment Execution Orchestration (main.py)
 "]
-    A2["Training Loop (`Trainer`)
+    A2["Training Loop (Trainer)
 "]
-    A3["Model Definition (`model.py`)
+    A3["Model Definition (model.py)
 "]
     A4["Hyperparameter Optimization (Optuna Integration)
 "]
-    A5["Pruning Strategy (`PFLPruner`)
+    A5["Pruning Strategy (PFLPruner)
 "]
-    A6["Analysis Utilities (`analyze.py` / `util.py`)
+    A6["Analysis Utilities (analyze.py / util.py)
 "]
     A0 -- "Provides Settings For" --> A1
     A0 -- "Specifies" --> A3
@@ -39,19 +39,19 @@ flowchart TD
 ## Chapters
 
 1. [Configuration Management (`RunConfig` / `OptimizeConfig`)
-](01_configuration_management___runconfig_____optimizeconfig___.md)
+](01_configuration_management___runconfig_____optimizeconfig___.html)
 2. [Experiment Execution Orchestration (`main.py`)
-](02_experiment_execution_orchestration___main_py___.md)
+](02_experiment_execution_orchestration___main_py___.html)
 3. [Training Loop (`Trainer`)
-](03_training_loop___trainer___.md)
+](03_training_loop___trainer___.html)
 4. [Model Definition (`model.py`)
-](04_model_definition___model_py___.md)
+](04_model_definition___model_py___.html)
 5. [Hyperparameter Optimization (Optuna Integration)
-](05_hyperparameter_optimization__optuna_integration__.md)
+](05_hyperparameter_optimization__optuna_integration__.html)
 6. [Pruning Strategy (`PFLPruner`)
-](06_pruning_strategy___pflpruner___.md)
+](06_pruning_strategy___pflpruner___.html)
 7. [Analysis Utilities (`analyze.py` / `util.py`)
-](07_analysis_utilities___analyze_py_____util_py___.md)
+](07_analysis_utilities___analyze_py_____util_py___.html)
 
 
 ---

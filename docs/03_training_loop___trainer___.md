@@ -141,7 +141,7 @@ sequenceDiagram
     alt Training Finished Normally or Early Stopped
         Trainer-->>-RunFunc: Return final_val_loss
     end
-
+end
 ```
 
 This diagram shows the cycle: for each epoch, the `Trainer` calls `train_epoch` (which iterates through training batches, performs forward/backward passes, and updates weights) and `val_epoch` (which iterates through validation batches and calculates loss without updating weights). After each epoch, it logs metrics, checks for early stopping, and adjusts the learning rate.

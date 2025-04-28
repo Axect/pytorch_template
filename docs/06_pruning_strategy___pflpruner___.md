@@ -126,6 +126,7 @@ sequenceDiagram
         PFLPruner-->>-ObjectiveFunc: Done
         ObjectiveFunc-->>-OptunaStudy: Report Trial N result (final_val_loss)
     end
+end
 ```
 
 1.  **Setup:** When `main.py` sets up the Optuna study ([Chapter 5]), it also creates the `PFLPruner` instance based on the `optimize_config.yaml`. This pruner instance is passed down through the `objective` function to the `util.run` function, and finally to the `Trainer` when it's initialized for a specific trial.
