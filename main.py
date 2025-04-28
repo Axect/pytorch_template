@@ -17,8 +17,6 @@ def main():
     )
     args = parser.parse_args()
 
-    wandb.require("core")  # pyright: ignore
-
     # Run Config
     base_config = RunConfig.from_yaml(args.run_config)
 
