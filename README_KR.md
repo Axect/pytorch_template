@@ -1,0 +1,440 @@
+# PyTorch Template 프로젝트
+
+[English](README.md) | [한글](README_KR.md)
+
+이 프로젝트는 PyTorch 기반 머신러닝 실험을 위한 유연한 템플릿을 제공합니다.
+YAML 파일을 이용한 설정 관리, Weights & Biases (wandb)를 사용한 로깅, Optuna를 이용한 하이퍼파라미터 최적화, 커스텀 학습률 스케줄러, 고급 프루닝 기법, 그리고 쉬운 커스터마이징과 실험을 위한 모듈식 구조를 포함합니다.
+
+## 목차
+
+-   [PyTorch Template 프로젝트](#pytorch-template-프로젝트)
+-   [프로젝트 구조](#프로젝트-구조)
+-   [사전 요구사항](#사전-요구사항)
+-   [설정](#설정)
+    -   [1. 이 템플릿으로 저장소 만들기](#1-이-템플릿으로-저장소-만들기)
+    -   [2. 의존성 설치](#2-의존성-설치)
+    -   [3. (선택) Weights & Biases 설정](#3-선택-weights--biases-설정)
+-   [사용법](#사용법)
+    -   [1. 실행 설정 구성](#1-실행-설정-구성)
+    -   [2. (선택) 최적화 설정 구성](#2-선택-최적화-설정-구성)
+    -   [3. 실험 실행](#3-실험-실행)
+    -   [4. 결과 분석](#4-결과-분석)
+-   [설정 파일](#설정-파일)
+    -   [실행 설정 (`run_template.yaml`)](#실행-설정-run_templateyaml)
+    -   [최적화 설정 (`optimize_template.yaml`)](#최적화-설정-optimize_templateyaml)
+-   [커스터마이징](#커스터마이징)
+    -   [1. 실행 설정 커스터마이징](#1-실행-설정-커스터마이징)
+    -   [2. 최적화 탐색 공간 커스터마이징](#2-최적화-탐색-공간-커스터마이징)
+    -   [3. 다른 Optuna Sampler 사용하기 (예: GridSampler)](#3-다른-optuna-sampler-사용하기-예-gridsampler)
+    -   [4. 커스텀 모델, 옵티마이저, 스케줄러, 프루너 추가하기](#4-커스텀-모델-옵티마이저-스케줄러-프루너-추가하기)
+    -   [5. 데이터 로딩 커스터마이징](#5-데이터-로딩-커스터마이징)
+    -   [6. 학습 루프 커스터마이징](#6-학습-루프-커스터마이징)
+-   [분석 스크립트 (`analyze.py`)](#분석-스크립트-analyzepy)
+-   [기여](#기여)
+-   [라이선스](#라이선스)
+-   [부록](#부록)
+    -   [PFL (Predicted Final Loss) 프루너](#pfl-predicted-final-loss-프루너)
+
+## 프로젝트 구조
+
+-   `config.py`: 실험 및 최적화 설정을 관리하기 위한 `RunConfig` 및 `OptimizeConfig` 클래스 정의
+-   `main.py`: 프로젝트 진입점, 명령줄 인자 처리 및 실험 실행 담당
+-   `model.py`: 모델 아키텍처 포함 (현재 MLP)
+-   `util.py`: 유틸리티 함수 (데이터 로딩, 학습 루프, 분석 도우미 함수 등)
+-   `analyze.py`: 완료된 실행 및 최적화 분석 스크립트
+-   `hyperbolic_lr.py`: 커스텀 쌍곡선 학습률 스케줄러 구현
+-   `pruner.py`: PFLPruner와 같은 커스텀 프루너 포함
+-   `configs/`: 설정 파일 디렉토리
+    -   `run_template.yaml`: 기본 실행 설정을 위한 템플릿
+    -   `optimize_template.yaml`: 최적화 설정을 위한 템플릿
+-   `runs/`: 실험 결과 (모델, 설정 등) 저장 디렉토리
+-   `requirements.txt`: 프로젝트 의존성 목록
+-   `README.md`: 현재 파일 (영문 버전)
+-   `README.ko.md`: 현재 파일 (한글 버전)
+-   `RELEASES.md`: 프로젝트 릴리스 노트
+
+## 사전 요구사항
+
+-   Python 3.x
+-   Git
+
+## 설정
+
+1.  **이 템플릿으로 저장소 만들기:**
+    -   GitHub에서 이 저장소의 메인 페이지로 이동합니다.
+    -   "Use this template" 버튼 (보통 우측 상단 근처)을 클릭합니다.
+    -   "Create a new repository"를 선택합니다.
+    -   소유자를 선택하고, 새 프로젝트의 저장소 이름을 입력한 후, 필요에 따라 다른 옵션들을 설정합니다.
+    -   "Create repository from template"을 클릭합니다.
+    -   이제 당신의 계정에 이 템플릿 파일들의 복사본을 가진 새로운 저장소가 생성되었습니다. *당신의* 새 저장소를 로컬 컴퓨터에 복제(clone)하세요:
+      ```sh
+      git clone [https://github.com/](https://github.com/)<your-username>/<your-new-repository-name>.git
+      cd <your-new-repository-name>
+      ```
+
+2.  **의존성 설치:**
+    가상 환경 사용을 권장합니다.
+    ```sh
+    # 가상 환경 생성 및 활성화 (venv 사용 예시)
+    python -m venv venv
+    source venv/bin/activate # Windows에서는 `venv\Scripts\activate` 사용
+
+    # uv 사용 (권장)
+    uv pip install -r requirements.txt
+
+    # 또는 pip 사용
+    pip install -r requirements.txt
+    ```
+    의존성에는 PyTorch, wandb, Optuna, beaupy 및 기타 필요한 패키지들이 포함됩니다.
+
+3.  **(선택) Weights & Biases 설정:**
+    로깅에 wandb를 사용하려면:
+    -   [https://wandb.ai/](https://wandb.ai/)에서 무료 계정에 가입합니다.
+    -   터미널에서 계정에 로그인합니다:
+      ```sh
+      wandb login
+      ```
+
+## 사용법
+
+1.  **실행 설정 구성:**
+    -   `configs/run_template.yaml` 파일을 수정하거나 복사본(예: `configs/my_experiment.yaml`)을 만들어 파라미터를 조정합니다. 자세한 내용은 [커스터마이징](#커스터마이징) 섹션을 참조하세요.
+
+2.  **(선택) 최적화 설정 구성:**
+    -   하이퍼파라미터 최적화를 수행하려면 `configs/optimize_template.yaml` 파일을 수정하거나 복사본(예: `configs/my_optimization.yaml`)을 만듭니다. `search_space`, `sampler`, `pruner`를 정의합니다. [커스터마이징](#커스터마이징) 섹션을 참조하세요.
+
+3.  **실험 실행:**
+
+    -   **단일 실행:**
+      ```sh
+      python main.py --run_config configs/run_template.yaml
+      ```
+      (필요시 `run_template.yaml`을 특정 실행 설정 파일명으로 바꾸세요).
+
+    -   **최적화 실행:**
+      ```sh
+      python main.py --run_config configs/run_template.yaml --optimize_config configs/optimize_template.yaml
+      ```
+      (필요시 파일명을 바꾸세요). 이는 `optimize_template.yaml` 설정에 따라 최적의 하이퍼파라미터를 찾기 위해 Optuna를 사용합니다.
+
+4.  **결과 분석:**
+    -   대화형 분석 스크립트 사용:
+      ```sh
+      python analyze.py
+      ```
+    -   안내에 따라 프로젝트, 실행 그룹, 시드(seed)를 선택하여 모델을 로드하고 분석합니다.
+
+## 설정 파일
+
+### 실행 설정 (`run_template.yaml`)
+
+-   `project`: 프로젝트 이름 (wandb 로깅 및 결과 저장에 사용됨).
+-   `device`: 실행 장치 ('cpu', 'cuda:0' 등).
+-   `net`: 모델 클래스 경로 (예: `model.MLP`).
+-   `optimizer`: 옵티마이저 클래스 경로 (예: `torch.optim.adamw.AdamW`).
+-   `scheduler`: 스케줄러 클래스 경로 (예: `hyperbolic_lr.ExpHyperbolicLR`, `torch.optim.lr_scheduler.CosineAnnealingLR`).
+-   `epochs`: 학습 에폭 수.
+-   `batch_size`: 학습 배치 크기.
+-   `seeds`: 여러 번 실행하기 위한 랜덤 시드 목록.
+-   `net_config`: 모델의 `__init__` 메서드에 전달될 인자들의 딕셔너리.
+-   `optimizer_config`: 옵티마이저를 위한 인자들의 딕셔너리.
+-   `scheduler_config`: 스케줄러를 위한 인자들의 딕셔너리.
+-   `early_stopping_config`: 조기 종료 설정.
+    -   `enabled`: `true` 또는 `false`.
+    -   `patience`: 마지막 개선 이후 기다릴 에폭 수.
+    -   `mode`: 'min' 또는 'max'.
+    -   `min_delta`: 개선으로 간주될 최소 변화량.
+
+### 최적화 설정 (`optimize_template.yaml`)
+
+-   `study_name`: Optuna 스터디 이름.
+-   `trials`: 실행할 최적화 시도 횟수.
+-   `seed`: 최적화 샘플러를 위한 랜덤 시드.
+-   `metric`: 최적화할 지표 (예: `val_loss`).
+-   `direction`: 'minimize' 또는 'maximize'.
+-   `sampler`: Optuna 샘플러 설정.
+    -   `name`: 샘플러 클래스 경로 (예: `optuna.samplers.TPESampler`).
+    -   `kwargs`: (선택) 샘플러 인자.
+-   `pruner`: (선택) Optuna 프루너 설정.
+    -   `name`: 프루너 클래스 경로 (예: `pruner.PFLPruner`).
+    -   `kwargs`: 프루너 인자.
+-   `search_space`: 탐색할 하이퍼파라미터 정의. `net_config`, `optimizer_config` 등의 하위에 중첩됨.
+    -   `type`: 'int', 'float', 또는 'categorical'.
+    -   `min`, `max`: 숫자 타입의 범위.
+    -   `log`: `true`이면 로그 스케일 (float).
+    -   `step`: 스텝 크기 (int).
+    -   `choices`: 선택 옵션 목록 (categorical).
+
+## 커스터마이징
+
+이 템플릿은 유연성을 위해 설계되었습니다. 다양한 부분을 커스터마이징하는 방법은 다음과 같습니다:
+
+### 1. 실행 설정 커스터마이징
+
+실행 설정 YAML 파일(예: `configs/run_template.yaml`)의 파라미터를 수정하여 실험 설정을 변경합니다.
+
+**예시:** `configs/run_template.yaml`을 기반으로 더 작은 네트워크와 다른 학습률을 사용하는 `configs/run_mlp_small_fastlr.yaml` 만들기.
+
+*원본 `configs/run_template.yaml` (간략화):*
+```yaml
+# configs/run_template.yaml
+project: PyTorch_Template
+device: cuda:0
+net: model.MLP
+optimizer: torch.optim.adamw.AdamW
+scheduler: hyperbolic_lr.ExpHyperbolicLR
+epochs: 50
+seeds: [89, 231, 928, 814, 269]
+net_config:
+  nodes: 64 # 원본 노드 수
+  layers: 4
+optimizer_config:
+  lr: 1.e-3 # 원본 학습률
+scheduler_config:
+  upper_bound: 250
+  max_iter: 50
+  infimum_lr: 1.e-5
+...
+````
+
+*새로운 `configs/run_mlp_small_fastlr.yaml`:*
+
+```yaml
+# configs/run_mlp_small_fastlr.yaml
+project: PyTorch_Template_SmallMLP # 프로젝트 이름 변경 가능
+device: cuda:0
+net: model.MLP
+optimizer: torch.optim.adamw.AdamW
+scheduler: hyperbolic_lr.ExpHyperbolicLR # 또는 스케줄러 변경
+epochs: 50
+seeds: [42, 123] # 원한다면 다른 시드 사용
+net_config:
+  nodes: 32   # 노드 수 변경
+  layers: 3   # 레이어 수 변경
+optimizer_config:
+  lr: 5.e-3 # 학습률 변경
+scheduler_config: # 필요시 스케줄러 파라미터 조정 (예: 에폭 또는 학습률 관련)
+  upper_bound: 250
+  max_iter: 50
+  infimum_lr: 1.e-5
+... # 다른 설정(예: early_stopping) 유지 또는 조정
+```
+
+이제 이 특정 설정을 실행할 수 있습니다:
+
+```sh
+python main.py --run_config configs/run_mlp_small_fastlr.yaml
+```
+
+### 2\. 최적화 탐색 공간 커스터마이징
+
+최적화 설정 파일(예: `configs/optimize_template.yaml`)의 `search_space` 섹션을 수정하여 Optuna가 탐색할 하이퍼파라미터와 그 범위/선택지를 변경합니다.
+
+**예시:** `configs/optimize_template.yaml`의 탐색 공간 조정.
+
+*원본 `search_space` (간략화):*
+
+```yaml
+# configs/optimize_template.yaml
+...
+search_space:
+  net_config:
+    nodes:
+      type: categorical
+      choices: [32, 64, 128] # 원본 선택지
+    layers:
+      type: int
+      min: 3
+      max: 5 # 원본 최대값
+  optimizer_config:
+    lr:
+      type: float
+      min: 1.e-3 # 원본 최소 학습률
+      max: 1.e-2
+      log: true
+  scheduler_config:
+    infimum_lr: # infimum_lr만 탐색
+      type: float
+      min: 1.e-7
+      max: 1.e-4
+      log: true
+...
+```
+
+*수정된 `search_space`:*
+
+```yaml
+# configs/optimize_template.yaml
+...
+search_space:
+  net_config:
+    nodes:
+      type: categorical
+      choices: [64, 128, 256] # 노드 선택지 변경
+    layers:
+      type: int
+      min: 4 # 최소 레이어 수 변경
+      max: 6 # 최대 레이어 수 변경
+  optimizer_config:
+    lr:
+      type: float
+      min: 5.e-4 # 최소 학습률 변경
+      max: 5.e-3 # 최대 학습률 변경
+      log: true
+  scheduler_config:
+    # upper_bound 탐색 추가
+    upper_bound:
+        type: int
+        min: 100
+        max: 300
+        step: 50
+    infimum_lr:
+      type: float
+      min: 1.e-6 # 범위 변경
+      max: 1.e-5
+      log: true
+...
+```
+
+이 업데이트된 설정은 다른 노드 크기, 레이어 수, 학습률 및 스케줄러 파라미터에 대해 탐색을 수행합니다.
+
+### 3\. 다른 Optuna Sampler 사용하기 (예: GridSampler)
+
+`configs/optimize_template.yaml`의 `sampler` 섹션을 수정하여 Optuna가 사용하는 샘플러를 변경할 수 있습니다.
+
+**예시:** `TPESampler`에서 `GridSampler`로 전환.
+
+*원본 `sampler` 섹션:*
+
+```yaml
+# configs/optimize_template.yaml
+...
+sampler:
+  name: optuna.samplers.TPESampler
+  #kwargs:
+  #  n_startup_trials: 10
+...
+```
+
+*`GridSampler` 사용:*
+
+```yaml
+# configs/optimize_template.yaml
+...
+sampler:
+  name: optuna.samplers.GridSampler # 샘플러 이름 변경
+  # kwargs: {} # GridSampler는 종종 여기에 kwargs가 필요 없음
+...
+# GridSampler 사용을 위한 중요 조건:
+# 'search_space'에 정의된 모든 파라미터는 반드시 'categorical' 타입이어야 합니다.
+# GridSampler는 범주형 선택지의 모든 조합을 탐색합니다.
+# 만약 search_space에 'int' 또는 'float' 타입이 포함되어 있다면, GridSampler 사용 시
+# 현재 config.py 구현에 따라 오류가 발생합니다.
+# (_create_sampler 및 grid_search_space 메서드 참조)
+
+# GridSampler와 호환되는 search_space 예시:
+search_space:
+  net_config:
+    nodes:
+      type: categorical
+      choices: [64, 128]
+    layers:
+      type: categorical # 반드시 categorical이어야 함
+      choices: [3, 4]
+  optimizer_config:
+    lr:
+      type: categorical # 반드시 categorical이어야 함
+      choices: [1.e-3, 5.e-3]
+  scheduler_config:
+    infimum_lr:
+      type: categorical # 반드시 categorical이어야 함
+      choices: [1.e-5, 1.e-6]
+...
+```
+
+**조건:** `GridSampler`를 사용하려면 `search_space` 아래에 나열된 *모든* 파라미터가 `type: categorical`인지 확인하세요. 코드는 이 조건이 충족될 경우에만 `GridSampler`에 필요한 형식을 자동으로 구성합니다.
+
+### 4\. 커스텀 모델, 옵티마이저, 스케줄러, 프루너 추가하기
+
+  - **모델:** `model.py` 또는 새 Python 파일에 모델 클래스(`torch.nn.Module` 상속)를 만듭니다. `__init__` 메서드가 첫 번째 인수로 설정 딕셔너리(예: YAML의 `net_config`)를 받도록 합니다. 실행 설정 YAML에서 `net:` 경로를 업데이트합니다.
+  - **옵티마이저/스케줄러:** 커스텀 클래스를 구현하거나 `torch.optim` 또는 다른 곳(예: `hyperbolic_lr.py`)의 기존 클래스를 사용합니다. YAML에서 `optimizer:` 또는 `scheduler:` 경로와 `*_config` 딕셔너리를 업데이트합니다. 템플릿은 제공된 경로를 기반으로 클래스를 동적으로 로드하기 위해 `importlib`를 사용합니다.
+  - **프루너:** `pruner.py` 또는 새 파일에 프루너 클래스(`pruner.BasePruner` 상속 또는 Optuna 프루너 인터페이스 구현)를 만듭니다. 최적화 YAML의 `pruner:` 섹션을 업데이트합니다.
+
+### 5\. 데이터 로딩 커스터마이징
+
+  - `util.py`의 `load_data` 함수를 수정하여 특정 데이터셋을 로드합니다. 이 함수는 학습 및 검증용 PyTorch `Dataset` 객체를 반환해야 합니다.
+
+### 6\. 학습 루프 커스터마이징
+
+  - `util.py`의 `Trainer` 클래스를 수정합니다. 특정 작업, 손실 함수 또는 메트릭에 맞게 `train_epoch`, `val_epoch`, `train` 메서드를 조정합니다. 해당되는 경우, `train` 메서드가 최적화 설정의 `metric`으로 지정된 값을 반환하도록 합니다.
+
+## 분석 스크립트 (`analyze.py`)
+
+`analyze.py` 스크립트는 완료된 실행 결과를 로드하고 검사하기 위한 대화형 명령줄 인터페이스를 제공합니다.
+
+  - `util.py`의 도우미 함수(`select_project`, `select_group`, `select_seed`, `load_model`, `load_study`, `load_best_model` 등)를 사용하여 `runs/` 디렉토리에 저장된 실행 결과를 탐색합니다.
+  - `analyze.py`의 `main` 함수를 쉽게 확장하여 프로젝트 요구사항에 맞는 더 자세한 분석, 플로팅 또는 평가를 수행할 수 있습니다.
+
+## 기여
+
+기여를 환영합니다\! 언제든지 Pull Request를 제출해 주세요.
+
+## 라이선스
+
+이 프로젝트는 템플릿으로 제공되며 자유롭게 사용, 수정 및 배포할 수 있도록 만들어졌습니다. 이 템플릿 사용자는 자신의 특정 프로젝트 요구사항에 가장 적합한 라이선스를 선택하는 것이 좋습니다.
+
+템플릿 자체에 대해:
+
+  - 이 템플릿을 자유롭게 사용, 수정 및 배포할 수 있습니다.
+  - 출처 표기는 필수는 아니지만 권장됩니다.
+  - 템플릿은 어떠한 종류의 보증 없이 "있는 그대로" 제공됩니다.
+
+자신의 프로젝트에 이 템플릿을 사용할 때 다음을 기억하십시오:
+
+1.  이 라이선스 섹션을 제거하거나 선택한 라이선스로 교체하십시오.
+2.  프로젝트에서 사용되는 모든 의존성 및 라이브러리가 해당 라이선스를 준수하는지 확인하십시오.
+
+라이선스 선택에 대한 자세한 내용은 [https://choosealicense.com/](https://choosealicense.com/)를 방문하십시오.
+
+## 부록
+
+<details>
+<summary><strong>PFL (Predicted Final Loss) 프루너</strong></summary>
+
+### 개요
+
+PFL 프루너 (`pruner.PFLPruner`)는 초기 단계의 메트릭을 기반으로 학습 실행의 최종 성능을 예측하는 기법에서 영감을 받은 커스텀 프루너입니다. 예측된 최종 손실 (`pfl`)을 기반으로 유망하지 않은 시도를 조기에 중단하여 하이퍼파라미터 검색을 최적화하는 데 도움이 됩니다.
+
+### 주요 특징
+
+  - 최종 검증 손실을 기준으로 성능이 가장 좋은 `top_k`개의 완료된 시도 목록을 유지합니다.
+  - 진행 중인 시도에 대해 (웜업 기간 후) 현재 손실 기록을 기반으로 최종 손실을 예측합니다.
+  - 현재 시도의 예측된 최종 손실 (`pfl`)을 `top_k`개의 완료된 시도 중에서 관찰된 최소 `pfl`과 비교합니다.
+  - 만약 현재 시도의 예측된 최종 손실이 top-k 목록의 가장 나쁜(가장 낮은) `pfl`보다 더 나쁘면 (더 낮으면, `pfl`은 -log10(loss)이므로) 해당 시도를 프루닝합니다.
+  - 의사 결정을 위해 시드 간 메트릭을 평균하여 다중 시드 실행을 지원합니다.
+  - Optuna의 스터디 메커니즘과 통합됩니다.
+
+### 설정
+
+`optimize_template.yaml` 파일의 `pruner` 섹션에서 프루너를 설정합니다:
+
+```yaml
+pruner:
+  name: pruner.PFLPruner # 프루너 클래스 경로
+  kwargs:
+    n_startup_trials: 10    # 프루닝 시작 전 완료해야 하는 시도 횟수
+    n_warmup_epochs: 10     # 시도 내에서 프루닝 고려 전 대기 에폭 수
+    top_k: 10               # 추적할 최상위 완료 시도 횟수
+    target_epoch: 50        # 최종 손실 예측에 사용되는 목표 에폭
+```
+
+### 작동 방식
+
+1.  첫 `n_startup_trials`개의 시도는 기준 성능을 설정하기 위해 프루닝 없이 완료됩니다.
+2.  이후의 시도에서는 `n_warmup_epochs` 이후에만 프루닝이 고려됩니다.
+3.  프루너는 현재 시도의 시드 전체에 대한 손실 기록을 기반으로 평균 예측 최종 손실 (`pfl`)을 계산합니다.
+4.  이 `pfl`을 이미 완료된 `top_k` 시도의 `pfl` 값과 비교합니다.
+5.  만약 현재 시도의 `pfl`이 상위 완료 시도 중에서 기록된 최소 `pfl`보다 낮으면 (낮은 `pfl`은 더 나쁜 예측 성능을 나타냄) 해당 시도는 프루닝됩니다.
+6.  시도가 완료되면 최종 검증 손실과 `pfl`이 `top_k` 목록 포함 여부를 결정하는 데 고려됩니다.
+
+</details>
