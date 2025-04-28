@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import TensorDataset
+from torch.utils.data import TensorDataset, random_split
 import torch.nn.functional as F
 import numpy as np
 import beaupy
@@ -16,25 +16,35 @@ from math import pi
 
 
 def load_data(n=10000, split_ratio=0.8, seed=42):
-    # Fix Seed
+    # Fix random seed for reproducibility
     torch.manual_seed(seed)
 
-    x = torch.linspace(0, 1, n) + torch.rand(n) * 0.01
-    y = torch.cos(x * (2 * pi)) + torch.rand(n) * 0.01
+    x_noise = torch.rand(n) * 0.02
+    x = torch.linspace(0, 1, n) + x_noise
+    x = x.clamp(0, 1) # Fix x to be in [0, 1]
 
-    ics = torch.randperm(n)
-    ics_train = ics[: int(n * split_ratio)]
-    ics_val = ics[int(n * split_ratio) :]
+    noise_level = 0.05
+    y = (
+        1.0 * torch.sin(4 * pi * x)
+        + 0.5 * torch.sin(10 * pi * x)
+        + 1.5 * (x**2)
+        + torch.randn(n) * noise_level
+    )
 
-    x_train = x[ics_train].view(-1, 1)
-    y_train = y[ics_train].view(-1, 1)
-    x_val = x[ics_val].view(-1, 1)
-    y_val = y[ics_val].view(-1, 1)
+    x = x.view(-1, 1)
+    y = y.view(-1, 1)
 
-    train_ds = TensorDataset(x_train, y_train)
-    val_ds = TensorDataset(x_val, y_val)
+    full_dataset = TensorDataset(x, y)
 
-    return train_ds, val_ds
+    train_size = int(n * split_ratio)
+    val_size = n - train_size
+
+    generator = torch.Generator().manual_seed(seed)
+    train_dataset, val_dataset = random_split(
+        full_dataset, [train_size, val_size], generator=generator
+    )
+
+    return train_dataset, val_dataset
 
 
 def set_seed(seed: int):
