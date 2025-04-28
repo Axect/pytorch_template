@@ -103,44 +103,38 @@ sequenceDiagram
     participant Model
     participant OptimizerScheduler as Optimizer / Scheduler
     participant LoggerEarlyStop as Logger (W&B) / EarlyStopping
-
-    RunFunc->>+Trainer: trainer.train(dl_train, dl_val, epochs)
+    
+    RunFunc->>Trainer: trainer.train(dl_train, dl_val, epochs)
+    
     loop For each Epoch (1 to 'epochs')
-        Trainer->>+Trainer: train_epoch(dl_train) # Ask Trainer to train one cycle
-        Trainer->>+DataLoaderTrain: Get next training batch (x, y)
-        DataLoaderTrain-->>-Trainer: Return batch
-        Trainer->>+Model: Forward pass: model(x)
-        Model-->>-Trainer: Return prediction y_pred
-        Trainer->>Trainer: Calculate loss(y_pred, y)
-        Trainer->>+OptimizerScheduler: Backpropagate loss & Update weights (optimizer.step())
-        OptimizerScheduler-->>-Trainer: Weights updated
-        Trainer->>DataLoaderTrain: Repeat for all batches in dl_train
-        Trainer-->>-Trainer: Return average train_loss for epoch
-
-        Trainer->>+Trainer: val_epoch(dl_val) # Ask Trainer to validate
-        Trainer->>+DataLoaderVal: Get next validation batch (x, y)
-        DataLoaderVal-->>-Trainer: Return batch
-        Trainer->>+Model: Forward pass: model(x) (No gradient tracking)
-        Model-->>-Trainer: Return prediction y_pred
-        Trainer->>Trainer: Calculate loss(y_pred, y)
-        Trainer->>DataLoaderVal: Repeat for all batches in dl_val
-        Trainer-->>-Trainer: Return average val_loss for epoch
-
-        Trainer->>+LoggerEarlyStop: Log metrics (train_loss, val_loss, lr)
-        LoggerEarlyStop-->>-Trainer: Metrics logged
-        Trainer->>+LoggerEarlyStop: Check EarlyStopping(val_loss)
+        Trainer->>DataLoaderTrain: Get training batches
+        DataLoaderTrain-->>Trainer: Return batches
+        Trainer->>Model: Forward pass
+        Model-->>Trainer: Return predictions
+        Trainer->>Trainer: Calculate loss
+        Trainer->>OptimizerScheduler: Backpropagate & update weights
+        OptimizerScheduler-->>Trainer: Weights updated
+        
+        Trainer->>DataLoaderVal: Get validation batches
+        DataLoaderVal-->>Trainer: Return batches
+        Trainer->>Model: Forward pass (no gradients)
+        Model-->>Trainer: Return predictions
+        Trainer->>Trainer: Calculate validation loss
+        
+        Trainer->>LoggerEarlyStop: Log metrics
+        LoggerEarlyStop-->>Trainer: Metrics logged
+        Trainer->>LoggerEarlyStop: Check early stopping
+        
         alt Early Stop Triggered
-            LoggerEarlyStop-->>-Trainer: Stop = True
-            Trainer->>Trainer: Break epoch loop
+            LoggerEarlyStop-->>Trainer: Stop = True
         else Continue Training
-            LoggerEarlyStop-->>-Trainer: Stop = False
+            LoggerEarlyStop-->>Trainer: Stop = False
+            Trainer->>OptimizerScheduler: Adjust learning rate
+            OptimizerScheduler-->>Trainer: LR adjusted
         end
-        Trainer->>+OptimizerScheduler: Adjust Learning Rate (scheduler.step())
-        OptimizerScheduler-->>-Trainer: LR adjusted
     end
-    alt Training Finished Normally or Early Stopped
-        Trainer-->>-RunFunc: Return final_val_loss
-    end
+    
+    Trainer-->>RunFunc: Return final_val_loss
 ```
 
 This diagram shows the cycle: for each epoch, the `Trainer` calls `train_epoch` (which iterates through training batches, performs forward/backward passes, and updates weights) and `val_epoch` (which iterates through validation batches and calculates loss without updating weights). After each epoch, it logs metrics, checks for early stopping, and adjusts the learning rate.
