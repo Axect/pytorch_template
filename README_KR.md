@@ -29,7 +29,11 @@ PyTorch 기반 머신러닝 실험을 위한 유연하고 재사용 가능한 �
     source .venv/bin/activate # Windows에서는 `.venv\Scripts\activate` 사용
 
     # 의존성 설치
+    uv pip install -U torch wandb rich beaupy polars numpy optuna matplotlib scienceplots
+
+    # 또는 기존 requirements 동기화 (주의: 이 버전은 CUDA환경에 최적화되어있음)
     uv pip sync requirements.txt
+
     # 또는 pip 사용: pip install -r requirements.txt
     ```
 4.  **(선택) Weights & Biases 로그인:**
@@ -447,4 +451,3 @@ pruner:
 6.  시도가 완료되면 최종 검증 손실과 `pfl`이 `top_k` 목록 포함 여부를 결정하는 데 고려됩니다.
 
 </details>
-
