@@ -154,28 +154,32 @@ class Trainer:
     def train_epoch(self, dl_train):
         self.model.train()
         train_loss = 0
+        total_size = 0
         for x, y in dl_train:
             x = x.to(self.device)
             y = y.to(self.device)
             y_pred = self.step(x)
             loss = self.criterion(y_pred, y)
-            train_loss += loss.item()
+            train_loss += loss.item() * x.shape[0]
+            total_size += x.shape[0]
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-        train_loss /= len(dl_train)
+        train_loss /= total_size
         return train_loss
 
     def val_epoch(self, dl_val):
         self.model.eval()
         val_loss = 0
+        total_size = 0
         for x, y in dl_val:
             x = x.to(self.device)
             y = y.to(self.device)
             y_pred = self.step(x)
             loss = self.criterion(y_pred, y)
-            val_loss += loss.item()
-        val_loss /= len(dl_val)
+            val_loss += loss.item() * x.shape[0]
+            total_size += x.shape[0]
+        val_loss /= total_size
         return val_loss
 
     def train(self, dl_train, dl_val, epochs):
