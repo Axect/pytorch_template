@@ -28,12 +28,17 @@ A flexible and reusable template for PyTorch-based machine learning experiments.
     uv venv
     source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
 
-    # Install requirements
+    # Install prerequsites (Recommended)
+    uv pip install -U torch wandb rich beaupy polars numpy optuna matplotlib scienceplots
+
+    # Or sync requirements (caution: this version is optimized for cuda environment)
     uv pip sync requirements.txt
+
     # Or using pip: pip install -r requirements.txt
     ```
 4.  **(Optional) Login to Weights & Biases:**
     ```bash
+    # only once per a machine
     wandb login
     ```
 5.  **Run a Default Experiment:**
@@ -446,4 +451,3 @@ pruner:
 6.  When a trial completes, its final validation loss and `pfl` are considered for inclusion in the `top_k` list.
 
 </details>
-
