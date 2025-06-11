@@ -329,6 +329,7 @@ def select_project():
     projects = [
         d for d in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, d))
     ]
+    projects.sort()
     if not projects:
         raise ValueError(f"No projects found in {runs_path}")
 
