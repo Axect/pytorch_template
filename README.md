@@ -144,7 +144,7 @@ For a deeper dive into the components and customization options, check out the d
 -   `project`: Project name (used for wandb and results saving).
 -   `device`: Device ('cpu', 'cuda:0', etc.).
 -   `net`: Path to the model class (e.g., `model.MLP`).
--   `optimizer`: Path to the optimizer class (e.g., `torch.optim.adamw.AdamW`).
+-   `optimizer`: Path to the optimizer class (e.g., `torch.optim.adamw.AdamW`, `splus.SPlus`).
 -   `scheduler`: Path to the scheduler class (e.g., `hyperbolic_lr.ExpHyperbolicLR`, `torch.optim.lr_scheduler.CosineAnnealingLR`).
 -   `epochs`: Number of training epochs.
 -   `batch_size`: Training batch size.
@@ -408,6 +408,14 @@ When using this template for your own project, please remember to:
 2.  Ensure all dependencies and libraries used in your project comply with their respective licenses.
 
 For more information on choosing a license, visit [https://choosealicense.com/](https://choosealicense.com/).
+
+## Acknowledgments
+
+This template includes copies of external libraries and tools, such as:
+
+- [HyperbolicLR](https://github.com/Axect/HyperbolicLR) for hyperbolic curve based learning rate scheduling.
+
+- [SPlus](https://github.com/kvfrans/splus) for SPlus optimizer.
 
 ## Appendix
 
