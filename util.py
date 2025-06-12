@@ -153,6 +153,9 @@ class Trainer:
 
     def train_epoch(self, dl_train):
         self.model.train()
+        # ScheduleFree Optimizer or SPlus
+        if any(keyword in self.optimizer.__class__.__name__ for keyword in ["ScheduleFree", "SPlus"]):
+            self.optimizer.train()
         train_loss = 0
         total_size = 0
         for x, y in dl_train:
@@ -170,6 +173,9 @@ class Trainer:
 
     def val_epoch(self, dl_val):
         self.model.eval()
+        # ScheduleFree Optimizer or SPlus
+        if any(keyword in self.optimizer.__class__.__name__ for keyword in ["ScheduleFree", "SPlus"]):
+            self.optimizer.eval()
         val_loss = 0
         total_size = 0
         for x, y in dl_val:
@@ -309,6 +315,10 @@ def run(
     except optuna.TrialPruned:
         wandb.finish()
         raise
+    except Exception as e:
+        print(f"Runtime error during training: {e}")
+        wandb.finish()
+        raise optuna.TrialPruned()
     finally:
         # Call trial_finished only once after all seeds are done
         if (
@@ -342,6 +352,7 @@ def select_group(project):
     groups = [
         d for d in os.listdir(runs_path) if os.path.isdir(os.path.join(runs_path, d))
     ]
+    groups.sort()
     if not groups:
         raise ValueError(f"No run groups found in {runs_path}")
 
@@ -354,6 +365,7 @@ def select_seed(project, group_name):
     seeds = [
         d for d in os.listdir(group_path) if os.path.isdir(os.path.join(group_path, d))
     ]
+    seeds.sort()
     if not seeds:
         raise ValueError(f"No seeds found in {group_path}")
 
