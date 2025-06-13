@@ -230,7 +230,7 @@ class Trainer:
                     trial_id=self.trial.number,
                     seed=self.seed,
                     epoch=epoch,
-                    value=train_loss,
+                    value=val_loss,
                 )
                 if self.pruner.should_prune():
                     raise optuna.TrialPruned()
