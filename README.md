@@ -20,7 +20,7 @@ A flexible and reusable template for PyTorch-based machine learning experiments.
 
 * **Reproducibility:** Ensure consistent results with built-in seed management.
 
-## 🚀 Quick Start
+## Quick Start
 
 1.  **Create Your Repository:** Click "Use this template" on the GitHub page to create your own repository based on this template.
 
@@ -66,7 +66,7 @@ A flexible and reusable template for PyTorch-based machine learning experiments.
     python analyze.py
     ```
 
-## 📖 Documentation
+## Documentation
 
 For a deeper dive into the components and customization options, check out the detailed documentation:
 
