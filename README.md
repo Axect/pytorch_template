@@ -4,24 +4,32 @@
 
 A flexible and reusable template for PyTorch-based machine learning experiments. Streamline your workflow with YAML configurations, integrated hyperparameter optimization (Optuna), experiment tracking (Weights & Biases), custom components, and easy result analysis.
 
-## ✨ Key Features
+## Key Features
 
-* **📄 YAML Configuration:** Easily manage all experiment settings (model, optimizer, scheduler, training parameters) using simple YAML files
-* **🚀 Hyperparameter Optimization:** Automatically find the best hyperparameters using Optuna integration
-* **📊 Experiment Tracking:** Log metrics, configurations, and models seamlessly with Weights & Biases
-* **✂️ Advanced Pruning:** Speed up optimization using custom pruners like the Predicted Final Loss (PFL) Pruner
-* **⚙️ Customizable Components:** Easily add or modify models ([`model.py`](model.py)), learning rate schedulers, optimizers, and the training loop ([`Trainer` in `util.py`](util.py)).
-* **📈 Analysis Tools:** Interactively load, analyze, and evaluate trained models and optimization results ([`analyze.py`](analyze.py)).
-* **🔄 Reproducibility:** Ensure consistent results with built-in seed management.
+* **YAML Configuration:** Easily manage all experiment settings (model, optimizer, scheduler, training parameters) using simple YAML files
+
+* **Hyperparameter Optimization:** Automatically find the best hyperparameters using Optuna integration
+
+* **Experiment Tracking:** Log metrics, configurations, and models seamlessly with Weights & Biases
+
+* **Advanced Pruning:** Speed up optimization using custom pruners like the Predicted Final Loss (PFL) Pruner
+
+* **Customizable Components:** Easily add or modify models ([`model.py`](model.py)), learning rate schedulers, optimizers, and the training loop ([`Trainer` in `util.py`](util.py)).
+
+* **Analysis Tools:** Interactively load, analyze, and evaluate trained models and optimization results ([`analyze.py`](analyze.py)).
+
+* **Reproducibility:** Ensure consistent results with built-in seed management.
 
 ## 🚀 Quick Start
 
 1.  **Create Your Repository:** Click "Use this template" on the GitHub page to create your own repository based on this template.
+
 2.  **Clone Your Repository:**
     ```bash
     git clone https://github.com/<your-username>/<your-new-repository-name>.git
     cd <your-new-repository-name>
     ```
+
 3.  **Set Up Environment & Install Dependencies:** (Using [uv](https://github.com/astral-sh/uv) is recommended)
     ```bash
     # Create and activate virtual environment
@@ -36,19 +44,23 @@ A flexible and reusable template for PyTorch-based machine learning experiments.
 
     # Or using pip: pip install -r requirements.txt
     ```
+
 4.  **(Optional) Login to Weights & Biases:**
     ```bash
     # only once per a machine
     wandb login
     ```
+
 5.  **Run a Default Experiment:**
     ```bash
     python main.py --run_config configs/run_template.yaml
     ```
+
 6.  **Run Hyperparameter Optimization:**
     ```bash
     python main.py --run_config configs/run_template.yaml --optimize_config configs/optimize_template.yaml
     ```
+
 7.  **Analyze Results:**
     ```bash
     python analyze.py
