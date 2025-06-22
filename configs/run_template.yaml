@@ -2,6 +2,7 @@ project: PyTorch_Template
 device: cuda:0
 net: model.MLP
 optimizer: torch.optim.adamw.AdamW
+optimizer: splus.SPlus
 scheduler: hyperbolic_lr.ExpHyperbolicLR
 epochs: 50
 batch_size: 256
@@ -11,6 +12,7 @@ net_config:
   layers: 4
 optimizer_config:
   lr: 1.e-3 # Must contain dot for float
+  eps: 1.e-10
 scheduler_config:
   upper_bound: 250
   max_iter: 50
