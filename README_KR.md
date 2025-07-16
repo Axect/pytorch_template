@@ -37,7 +37,10 @@ PyTorch 기반 머신러닝 실험을 위한 유연하고 재사용 가능한 �
     source .venv/bin/activate # Windows에서는 `.venv\Scripts\activate` 사용
 
     # 의존성 설치
-    uv pip install -U torch wandb rich beaupy polars numpy optuna matplotlib scienceplots
+    uv pip install -U torch wandb rich beaupy fireducks numpy optuna matplotlib scienceplots
+
+    # 또는 shell 스크립트 사용:
+    sh install_requirements.sh
 
     # 또는 기존 requirements 동기화 (주의: 이 버전은 CUDA환경에 최적화되어있음)
     uv pip sync requirements.txt

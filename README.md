@@ -37,7 +37,10 @@ A flexible and reusable template for PyTorch-based machine learning experiments.
     source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
 
     # Install prerequsites (Recommended)
-    uv pip install -U torch wandb rich beaupy polars numpy optuna matplotlib scienceplots
+    uv pip install -U torch wandb rich beaupy fireducks numpy optuna matplotlib scienceplots
+
+    # Or execute install script (shell script)
+    sh install_requirements.sh
 
     # Or sync requirements (caution: this version is optimized for cuda environment)
     uv pip sync requirements.txt
