@@ -6,6 +6,7 @@ import beaupy
 from rich.console import Console
 import wandb
 import optuna
+from tqdm import tqdm
 
 from config import RunConfig
 
@@ -151,14 +152,18 @@ class Trainer:
     def step(self, x):
         return self.model(x)
 
-    def train_epoch(self, dl_train):
+    def train_epoch(self, dl_train, epoch=None, total_epochs=None):
         self.model.train()
         # ScheduleFree Optimizer or SPlus
         if any(keyword in self.optimizer.__class__.__name__ for keyword in ["ScheduleFree", "SPlus"]):
             self.optimizer.train()
         train_loss = 0
         total_size = 0
-        for x, y in dl_train:
+
+        # Create progress bar description
+        desc = f"Epoch {epoch+1}/{total_epochs}" if epoch is not None and total_epochs is not None else "Training"
+
+        for x, y in tqdm(dl_train, desc=desc, leave=False):
             x = x.to(self.device)
             y = y.to(self.device)
             y_pred = self.step(x)
@@ -178,7 +183,7 @@ class Trainer:
             self.optimizer.eval()
         val_loss = 0
         total_size = 0
-        for x, y in dl_val:
+        for x, y in tqdm(dl_val, desc="Validation", leave=False):
             x = x.to(self.device)
             y = y.to(self.device)
             y_pred = self.step(x)
@@ -192,21 +197,21 @@ class Trainer:
         val_loss = 0
         val_losses = []
 
-        for epoch in range(epochs):
-            train_loss = self.train_epoch(dl_train)
+        for epoch in tqdm(range(epochs), desc="Overall Progress"):
+            train_loss = self.train_epoch(dl_train, epoch=epoch, total_epochs=epochs)
             val_loss = self.val_epoch(dl_val)
             val_losses.append(val_loss)
 
             # Early stopping if loss becomes NaN
             if math.isnan(train_loss) or math.isnan(val_loss):
-                print("Early stopping due to NaN loss")
+                tqdm.write("Early stopping due to NaN loss")
                 val_loss = math.inf
                 break
 
             # Early stopping check
             if self.early_stopping is not None:
                 if self.early_stopping(val_loss):
-                    print(f"Early stopping triggered at epoch {epoch}")
+                    tqdm.write(f"Early stopping triggered at epoch {epoch}")
                     break
 
             log_dict = {
@@ -241,7 +246,7 @@ class Trainer:
                 print_str = f"epoch: {epoch}"
                 for key, value in log_dict.items():
                     print_str += f", {key}: {value:.4e}"
-                print(print_str)
+                tqdm.write(print_str)
 
         return val_loss
 
@@ -316,7 +321,7 @@ def run(
         wandb.finish()
         raise
     except Exception as e:
-        print(f"Runtime error during training: {e}")
+        tqdm.write(f"Runtime error during training: {e}")
         wandb.finish()
         raise optuna.TrialPruned()
     finally:
