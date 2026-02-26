@@ -2,6 +2,12 @@
 
 [English](README.md) | [한글](README_KR.md)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch 2.7+](https://img.shields.io/badge/PyTorch-2.7+-ee4c2c.svg)](https://pytorch.org/)
+[![Optuna](https://img.shields.io/badge/Optuna-integrated-blue.svg)](https://optuna.org/)
+[![W&B](https://img.shields.io/badge/Weights_%26_Biases-supported-FFBE00.svg)](https://wandb.ai/)
+
 A flexible and reusable template for PyTorch-based machine learning experiments. Streamline your workflow with YAML configurations, integrated hyperparameter optimization (Optuna), experiment tracking (Weights & Biases), custom components, and easy result analysis.
 
 ## Key Features
@@ -409,20 +415,9 @@ Contributions are welcome\! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is provided as a template and is intended to be freely used, modified, and distributed. Users of this template are encouraged to choose a license that best suits their specific project needs.
+This project is licensed under the [MIT License](LICENSE).
 
-For the template itself:
-
-  - You are free to use, modify, and distribute this template.
-  - No attribution is required, although it is appreciated.
-  - The template is provided "as is", without warranty of any kind.
-
-When using this template for your own project, please remember to:
-
-1.  Remove this license section or replace it with your chosen license.
-2.  Ensure all dependencies and libraries used in your project comply with their respective licenses.
-
-For more information on choosing a license, visit [https://choosealicense.com/](https://choosealicense.com/).
+When using this template for your own project, you are free to replace the license with one that best suits your needs. Ensure all dependencies and libraries used in your project comply with their respective licenses.
 
 ## Acknowledgments
 

@@ -2,6 +2,12 @@
 
 [English](README.md) | [한글](README_KR.md)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch 2.7+](https://img.shields.io/badge/PyTorch-2.7+-ee4c2c.svg)](https://pytorch.org/)
+[![Optuna](https://img.shields.io/badge/Optuna-integrated-blue.svg)](https://optuna.org/)
+[![W&B](https://img.shields.io/badge/Weights_%26_Biases-supported-FFBE00.svg)](https://wandb.ai/)
+
 PyTorch 기반 머신러닝 실험을 위한 유연하고 재사용 가능한 템플릿입니다. YAML 설정, 통합된 하이퍼파라미터 최적화(Optuna), 실험 추적(Weights & Biases), 커스텀 컴포넌트, 쉬운 결과 분석으로 워크플로우를 간소화하세요.
 
 ## 주요 특징
@@ -409,20 +415,9 @@ search_space:
 
 ## 라이선스
 
-이 프로젝트는 템플릿으로 제공되며 자유롭게 사용, 수정 및 배포할 수 있도록 만들어졌습니다. 이 템플릿 사용자는 자신의 특정 프로젝트 요구사항에 가장 적합한 라이선스를 선택하는 것이 좋습니다.
+이 프로젝트는 [MIT 라이선스](LICENSE)에 따라 배포됩니다.
 
-템플릿 자체에 대해:
-
-  - 이 템플릿을 자유롭게 사용, 수정 및 배포할 수 있습니다.
-  - 출처 표기는 필수는 아니지만 권장됩니다.
-  - 템플릿은 어떠한 종류의 보증 없이 "있는 그대로" 제공됩니다.
-
-자신의 프로젝트에 이 템플릿을 사용할 때 다음을 기억하십시오:
-
-1.  이 라이선스 섹션을 제거하거나 선택한 라이선스로 교체하십시오.
-2.  프로젝트에서 사용되는 모든 의존성 및 라이브러리가 해당 라이선스를 준수하는지 확인하십시오.
-
-라이선스 선택에 대한 자세한 내용은 [https://choosealicense.com/](https://choosealicense.com/)를 방문하십시오.
+이 템플릿을 자신의 프로젝트에 사용할 때, 필요에 맞는 라이선스로 자유롭게 교체할 수 있습니다. 프로젝트에서 사용되는 모든 의존성 및 라이브러리가 해당 라이선스를 준수하는지 확인하십시오.
 
 ## 부록
 

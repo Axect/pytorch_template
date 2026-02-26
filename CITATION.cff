@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this template, please cite it as below."
+type: software
+title: "PyTorch Template Project"
+authors:
+  - family-names: "Kim"
+    given-names: "Tae-Geun"
+    alias: "Axect"
+    orcid: "https://orcid.org/0009-0000-4229-2935"
+repository-code: "https://github.com/Axect/pytorch_template"
+license: MIT
+keywords:
+  - pytorch
+  - deep-learning
+  - experiment-template
+  - hyperparameter-optimization
+  - optuna
+  - wandb
