@@ -1,8 +1,32 @@
 from dataclasses import dataclass, asdict, field
+import copy
 import optuna
 import yaml
 import importlib
 
+
+# ── Duplicate-key-detecting YAML loader ──────────────────────────────────────
+
+class _DuplicateKeyLoader(yaml.SafeLoader):
+    pass
+
+
+def _check_duplicates(loader, node):
+    mapping = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node)
+        if key in mapping:
+            raise yaml.YAMLError(f"Duplicate key '{key}' found in YAML config")
+        mapping[key] = loader.construct_object(value_node)
+    return mapping
+
+
+_DuplicateKeyLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _check_duplicates
+)
+
+
+# ── Dataclasses ──────────────────────────────────────────────────────────────
 
 @dataclass
 class EarlyStoppingConfig:
@@ -10,6 +34,16 @@ class EarlyStoppingConfig:
     patience: int = 10
     mode: str = "min"  # "min" or "max"
     min_delta: float = 0.0001
+
+
+@dataclass
+class CheckpointConfig:
+    enabled: bool = False
+    save_every_n_epochs: int = 10
+    keep_last_k: int = 3
+    save_best: bool = True
+    monitor: str = "val_loss"
+    mode: str = "min"
 
 
 @dataclass
@@ -28,17 +62,108 @@ class RunConfig:
     early_stopping_config: EarlyStoppingConfig = field(
         default_factory=lambda: EarlyStoppingConfig()
     )
+    criterion: str = "torch.nn.MSELoss"
+    criterion_config: dict = field(default_factory=dict)
+    checkpoint_config: CheckpointConfig = field(
+        default_factory=lambda: CheckpointConfig()
+    )
+    monitor: str = "val_loss"
 
     def __post_init__(self):
+        # ── Convert dicts to dataclass instances ──
         if isinstance(self.early_stopping_config, dict):
             self.early_stopping_config = EarlyStoppingConfig(
                 **self.early_stopping_config
             )
+        if isinstance(self.checkpoint_config, dict):
+            self.checkpoint_config = CheckpointConfig(
+                **self.checkpoint_config
+            )
+
+        # ── Tier 1: Structural validation ──
+        if self.epochs <= 0:
+            raise ValueError(f"epochs must be > 0, got {self.epochs}")
+        if self.batch_size <= 0:
+            raise ValueError(f"batch_size must be > 0, got {self.batch_size}")
+        if not self.seeds:
+            raise ValueError("seeds must be non-empty")
+
+        for name, path in [("net", self.net), ("optimizer", self.optimizer),
+                           ("scheduler", self.scheduler)]:
+            if "." not in path:
+                raise ValueError(
+                    f"{name} must be in module.Class format (contain at least one '.'), "
+                    f"got '{path}'"
+                )
+
+        if self.early_stopping_config.enabled:
+            if self.early_stopping_config.patience <= 0:
+                raise ValueError(
+                    f"early_stopping patience must be > 0, got "
+                    f"{self.early_stopping_config.patience}"
+                )
+            if self.early_stopping_config.mode not in ("min", "max"):
+                raise ValueError(
+                    f"early_stopping mode must be 'min' or 'max', got "
+                    f"'{self.early_stopping_config.mode}'"
+                )
+
+        # ── Freeze the config ──
+        object.__setattr__(self, '_frozen', True)
+
+    def __setattr__(self, name, value):
+        if name == '_frozen' or not getattr(self, '_frozen', False):
+            object.__setattr__(self, name, value)
+        else:
+            raise AttributeError(
+                "RunConfig is frozen. Use with_overrides() to create a modified copy."
+            )
+
+    def validate_for_execution(self):
+        """Tier 2 — runtime validation: check device & importlib paths."""
+        # ── Device availability ──
+        if self.device.startswith("cuda"):
+            import torch
+            if not torch.cuda.is_available():
+                raise RuntimeError(
+                    f"Device '{self.device}' requested but CUDA is not available"
+                )
+
+        # ── Import path resolution ──
+        for label, dotted_path in [
+            ("net", self.net),
+            ("optimizer", self.optimizer),
+            ("scheduler", self.scheduler),
+            ("criterion", self.criterion),
+        ]:
+            module_name, class_name = dotted_path.rsplit(".", 1)
+            try:
+                module = importlib.import_module(module_name)
+            except ImportError as e:
+                raise ImportError(
+                    f"Cannot import module '{module_name}' for {label}: {e}"
+                ) from e
+            if not hasattr(module, class_name):
+                raise AttributeError(
+                    f"Module '{module_name}' has no attribute '{class_name}' "
+                    f"(for {label})"
+                )
+
+    def with_overrides(self, **kwargs) -> 'RunConfig':
+        """Return a new RunConfig with the given fields replaced (deep-merge dicts)."""
+        current = copy.deepcopy(asdict(self))
+        for key, value in kwargs.items():
+            if isinstance(value, dict) and isinstance(current.get(key), dict):
+                current[key] = {**current[key], **value}
+            else:
+                current[key] = value
+        current.pop('_frozen', None)
+        return RunConfig(**current)
 
     @classmethod
     def from_yaml(cls, path: str):
         with open(path, "r") as file:
-            config = yaml.safe_load(file)
+            config = yaml.load(file, Loader=_DuplicateKeyLoader)
         return cls(**config)
 
     def to_yaml(self, path: str):
@@ -62,6 +187,12 @@ class RunConfig:
         scheduler_module = importlib.import_module(scheduler_module)
         scheduler_class = getattr(scheduler_module, scheduler_class)
         return scheduler_class(optimizer, **self.scheduler_config)
+
+    def create_criterion(self):
+        module_name, class_name = self.criterion.rsplit(".", 1)
+        module = importlib.import_module(module_name)
+        criterion_class = getattr(module, class_name)
+        return criterion_class(**self.criterion_config)
 
     def gen_group_name(self):
         name = f"{self.net.split('.')[-1]}"
@@ -92,7 +223,7 @@ def default_run_config():
         project="PyTorch_Template",
         device="cpu",
         seeds=[42],
-        net="MLP",
+        net="model.MLP",
         optimizer="torch.optim.adamw.AdamW",
         scheduler="torch.optim.lr_scheduler.CosineAnnealingLR",
         epochs=50,
@@ -125,7 +256,7 @@ class OptimizeConfig:
     @classmethod
     def from_yaml(cls, path):
         with open(path, "r") as file:
-            config = yaml.safe_load(file)
+            config = yaml.load(file, Loader=_DuplicateKeyLoader)
         return cls(**config)
 
     def to_yaml(self, path):

@@ -25,7 +25,7 @@ def main():
 
     # Device
     if args.device:
-        base_config.device = args.device
+        base_config = base_config.with_overrides(device=args.device)
 
     # Load data
     ds_train, ds_val = load_data()  # pyright: ignore
@@ -40,12 +40,11 @@ def main():
         def objective(trial, base_config, optimize_config, dl_train, dl_val):
             params = optimize_config.suggest_params(trial)
 
-            config = base_config.gen_config()
-            config["project"] = f"{base_config.project}_Opt"
+            overrides = {"project": f"{base_config.project}_Opt"}
             for category, category_params in params.items():
-                config[category].update(category_params)
+                overrides[category] = category_params
 
-            run_config = RunConfig(**config)
+            run_config = base_config.with_overrides(**overrides)
             group_name = run_config.gen_group_name()
             group_name += f"[{trial.number}]"
 

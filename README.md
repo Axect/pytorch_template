@@ -1,4 +1,4 @@
-# PyTorch Template Project
+# PyTorch Template
 
 [English](README.md) | [한글](README_KR.md)
 
@@ -8,424 +8,298 @@
 [![Optuna](https://img.shields.io/badge/Optuna-integrated-blue.svg)](https://optuna.org/)
 [![W&B](https://img.shields.io/badge/Weights_%26_Biases-supported-FFBE00.svg)](https://wandb.ai/)
 
-A flexible and reusable template for PyTorch-based machine learning experiments. Streamline your workflow with YAML configurations, integrated hyperparameter optimization (Optuna), experiment tracking (Weights & Biases), custom components, and easy result analysis.
+A modular, extensible template for PyTorch-based deep learning research. Define your entire experiment — model, optimizer, scheduler, loss function, callbacks — in a single YAML file and run it with one command.
 
 ## Key Features
 
-* **YAML Configuration:** Easily manage all experiment settings (model, optimizer, scheduler, training parameters) using simple YAML files
+- **YAML-Driven Configuration** — All experiment settings managed in YAML. Frozen, validated configs prevent silent misconfiguration.
+- **Callback-Based Training** — Extensible training loop with priority-ordered callbacks. Add behaviors (logging, checkpointing, early stopping) without modifying core code.
+- **Configurable Loss & Metrics** — Swap loss functions via YAML (`torch.nn.CrossEntropyLoss`, custom losses). Built-in metric registry (MSE, MAE, R2) with importlib extension.
+- **Checkpoint & Resume** — Full state checkpointing (model, optimizer, scheduler, RNG states) with multi-seed resume via `SeedManifest`.
+- **Run Provenance** — Automatic capture of Python/PyTorch/CUDA versions, GPU info, git commit, and environment variables per run.
+- **Hyperparameter Optimization** — Optuna integration with custom PFL pruner and deep-merge config overrides.
+- **Experiment Tracking** — Seamless Weights & Biases logging via callback.
+- **CLI** — `typer`-based CLI with `train`, `validate`, `preview`, `doctor`, and `analyze` subcommands.
+- **Reproducibility** — Deterministic seed management across Python, NumPy, and PyTorch.
 
-* **Hyperparameter Optimization:** Automatically find the best hyperparameters using Optuna integration
+## Callback Architecture
 
-* **Experiment Tracking:** Log metrics, configurations, and models seamlessly with Weights & Biases
+The training loop emits events at defined hook points. Each concern (logging, early stopping, checkpointing) is an independent, priority-ordered callback:
 
-* **Advanced Pruning:** Speed up optimization using custom pruners like the Predicted Final Loss (PFL) Pruner
+![Callback Execution Flow](assets/callback_flow.png)
 
-* **Customizable Components:** Easily add or modify models ([`model.py`](model.py)), learning rate schedulers, optimizers, and the training loop ([`Trainer` in `util.py`](util.py)).
+| Callback | Priority | Hook | Purpose |
+|----------|----------|------|---------|
+| `NaNDetectionCallback` | 5 | `on_epoch_end` | Detect NaN loss, signal stop |
+| `OptimizerModeCallback` | 10 | `on_train_epoch_begin`, `on_val_begin` | SPlus/ScheduleFree train/eval mode |
+| `LossPredictionCallback` | 70 | `on_val_end` | Predict final loss for early pruning |
+| `WandbLoggingCallback` | 80 | `on_epoch_end` | Log metrics to W&B |
+| `PrunerCallback` | 85 | `on_val_end` | Report to Optuna pruner |
+| `EarlyStoppingCallback` | 90 | `on_val_end` | Monitor metric, signal stop |
+| `CheckpointCallback` | 95 | `on_epoch_end` | Save periodic/best checkpoints |
 
-* **Analysis Tools:** Interactively load, analyze, and evaluate trained models and optimization results ([`analyze.py`](analyze.py)).
-
-* **Reproducibility:** Ensure consistent results with built-in seed management.
+Adding custom behavior is as simple as subclassing `TrainingCallback` and adding it to the callback list — zero changes to the training loop.
 
 ## Quick Start
 
-1.  **Create Your Repository:** Click "Use this template" on the GitHub page to create your own repository based on this template.
-
-2.  **Clone Your Repository:**
+1.  **Clone:**
     ```bash
-    git clone https://github.com/<your-username>/<your-new-repository-name>.git
-    cd <your-new-repository-name>
+    git clone https://github.com/<your-username>/<your-repo>.git
+    cd <your-repo>
     ```
 
-3.  **Set Up Environment & Install Dependencies:** (Using [uv](https://github.com/astral-sh/uv) is recommended)
+2.  **Install dependencies** ([uv](https://github.com/astral-sh/uv) recommended):
     ```bash
-    # Create and activate virtual environment
-    uv venv
-    source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
-
-    # Install prerequsites (Recommended)
-    uv pip install -U torch wandb rich beaupy fireducks numpy optuna matplotlib scienceplots
-
-    # Or execute install script (shell script)
-    sh install_requirements.sh
-
-    # Or sync requirements (caution: this version is optimized for cuda environment)
-    uv pip sync requirements.txt
-
-    # Or using pip: pip install -r requirements.txt
+    uv venv && source .venv/bin/activate
+    uv pip install -U torch wandb rich beaupy numpy optuna matplotlib scienceplots typer tqdm pyyaml
     ```
 
-4.  **(Optional) Login to Weights & Biases:**
+3.  **Validate your setup:**
     ```bash
-    # only once per a machine
-    wandb login
+    python -m cli doctor
     ```
 
-5.  **Run a Default Experiment:**
+4.  **Preview a config** (no training, just inspect):
     ```bash
-    python main.py --run_config configs/run_template.yaml
+    python -m cli preview configs/run_template.yaml
     ```
 
-6.  **Run Hyperparameter Optimization:**
+5.  **Train:**
     ```bash
-    python main.py --run_config configs/run_template.yaml --optimize_config configs/optimize_template.yaml
+    python -m cli train configs/run_template.yaml
+    # Or with device override:
+    python -m cli train configs/run_template.yaml --device cpu
     ```
 
-7.  **Analyze Results:**
+6.  **Hyperparameter optimization:**
     ```bash
-    python analyze.py
+    python -m cli train configs/run_template.yaml --optimize-config configs/optimize_template.yaml
     ```
 
-## Documentation
+7.  **Analyze results:**
+    ```bash
+    python -m cli analyze
+    # Or non-interactive:
+    python -m cli analyze --project MyProject --group MyGroup --seed 42
+    ```
 
-For a deeper dive into the components and customization options, check out the detailed documentation:
-
-* **[Project Documentation](https://axect.github.io/pytorch_template)** (Covers Configuration, Execution, Training Loop, Model Definition, Optimization, Pruning, Analysis) (Generated by [Tutorial-Codebase-Knowledge](https://github.com/The-Pocket/Tutorial-Codebase-Knowledge))
-
-## Outline
-
--   [PyTorch Template Project](#pytorch-template-project)
--   [Project Structure](#project-structure)
--   [Prerequisites](#prerequisites)
--   [Usage](#usage)
-    -   [1. Configure Your Run](#1-configure-your-run)
-    -   [2. (Optional) Configure Optimization](#2-optional-configure-optimization)
-    -   [3. Run the Experiment](#3-run-the-experiment)
-    -   [4. Analyze Results](#4-analyze-results)
--   [Configuration Files](#configuration-files)
-    -   [Run Configuration (`run_template.yaml`)](#run-configuration-run_templateyaml)
-    -   [Optimization Configuration (`optimize_template.yaml`)](#optimization-configuration-optimize_templateyaml)
--   [Customization](#customization)
-    -   [1. Customizing Run Configurations](#1-customizing-run-configurations)
-    -   [2. Customizing Optimization Search Space](#2-customizing-optimization-search-space)
-    -   [3. Using Different Optuna Samplers (e.g., GridSampler)](#3-using-different-optuna-samplers-eg-gridsampler)
-    -   [4. Adding Custom Models, Optimizers, Schedulers, Pruners](#4-adding-custom-models-optimizers-schedulers-pruners)
-    -   [5. Customizing Data Loading](#5-customizing-data-loading)
-    -   [6. Customizing the Training Loop](#6-customizing-the-training-loop)
--   [Analysis Script (`analyze.py`)](#analysis-script-analyzepy)
--   [Contributing](#contributing)
--   [License](#license)
--   [Appendix](#appendix)
-    -   [PFL (Predicted Final Loss) Pruner](#pfl-predicted-final-loss-pruner)
+> **Legacy CLI**: `python main.py --run_config configs/run_template.yaml` still works for backward compatibility.
 
 ## Project Structure
 
-- `config.py`: Defines `RunConfig` and `OptimizeConfig` for managing experiment and optimization settings.
-- `main.py`: Entry point, handles arguments and experiment execution.
-- `model.py`: Contains model architectures (e.g., MLP).
-- `util.py`: Utility functions (data loading, training loop, analysis helpers, etc.).
-- `analyze.py`: Script for analyzing completed runs and optimizations.
-- `hyperbolic_lr.py`: Implementation of custom hyperbolic learning rate schedulers.
-- `pruner.py`: Contains custom pruners like PFLPruner.
-- `configs/`: Directory for configuration files.
-    - `run_template.yaml`: Template for basic run configuration.
-    - `optimize_template.yaml`: Template for optimization configuration.
-- `runs/`: Directory where experiment results (models, configs) are saved.
-- `requirements.txt`: Lists project dependencies.
-- `README.md`: This file.
-- `RELEASES.md`: Project release notes.
+```
+pytorch_template/
+├── cli.py                 # Typer CLI entrypoint (train, validate, preview, doctor, analyze)
+├── main.py                # Legacy argparse entrypoint
+├── config.py              # RunConfig (frozen, validated) + OptimizeConfig
+├── util.py                # Trainer, run(), data loading, analysis helpers
+├── callbacks.py           # Callback system (8 built-in callbacks + CallbackRunner)
+├── metrics.py             # Metric registry (MSE, MAE, R2 + importlib extension)
+├── checkpoint.py          # CheckpointManager + SeedManifest
+├── provenance.py          # Environment capture + config hashing
+├── model.py               # Model architectures (MLP)
+├── hyperbolic_lr.py       # HyperbolicLR + ExpHyperbolicLR schedulers
+├── pruner.py              # PFL pruner for Optuna
+├── splus.py               # SPlus optimizer
+├── configs/
+│   ├── run_template.yaml
+│   └── optimize_template.yaml
+├── recipes/
+│   ├── regression/        # Sine wave regression (MLP + MSELoss)
+│   └── classification/    # FashionMNIST classification (CNN + CrossEntropyLoss)
+├── tests/                 # 36 unit tests
+└── runs/                  # Experiment outputs (auto-created)
+```
 
-## Prerequisites
-
-- Python 3.x
-- Git
-
-## Usage
-
-1.  **Configure Your Run:**
-    - Modify `configs/run_template.yaml` or create a copy (e.g., `configs/my_experiment.yaml`) and adjust the parameters. See the [Customization](#customization) section for details.
-
-2.  **(Optional) Configure Optimization:**
-    - If you want to perform hyperparameter optimization, modify `configs/optimize_template.yaml` or create a copy (e.g., `configs/my_optimization.yaml`). Define the `search_space`, `sampler`, and `pruner`. See the [Customization](#customization) section.
-
-3.  **Run the Experiment:**
-
-    - **Single Run:**
-      ```sh
-      python main.py --run_config configs/run_template.yaml
-      ```
-      (Replace `run_template.yaml` with your specific run configuration file if needed).
-
-    - **Optimization Run:**
-      ```sh
-      python main.py --run_config configs/run_template.yaml --optimize_config configs/optimize_template.yaml
-      ```
-      (Replace file names as needed). This will use Optuna to search for the best hyperparameters based on your `optimize_template.yaml`.
-
-4.  **Analyze Results:**
-    - Use the interactive analysis script:
-      ```sh
-      python analyze.py
-      ```
-    - Follow the prompts to select the project, run group, and seed to load and analyze the model.
-
-## Configuration Files
+## Configuration
 
 ### Run Configuration (`run_template.yaml`)
 
--   `project`: Project name (used for wandb and results saving).
--   `device`: Device ('cpu', 'cuda:0', etc.).
--   `net`: Path to the model class (e.g., `model.MLP`).
--   `optimizer`: Path to the optimizer class (e.g., `torch.optim.adamw.AdamW`, `splus.SPlus`).
--   `scheduler`: Path to the scheduler class (e.g., `hyperbolic_lr.ExpHyperbolicLR`, `torch.optim.lr_scheduler.CosineAnnealingLR`).
--   `epochs`: Number of training epochs.
--   `batch_size`: Training batch size.
--   `seeds`: List of random seeds for running the experiment multiple times.
--   `net_config`: Dictionary of arguments passed to the model's `__init__` method.
--   `optimizer_config`: Dictionary of arguments for the optimizer.
--   `scheduler_config`: Dictionary of arguments for the scheduler.
--   `early_stopping_config`: Configuration for early stopping.
-    -   `enabled`: `true` or `false`.
-    -   `patience`: How many epochs to wait after last improvement.
-    -   `mode`: 'min' or 'max'.
-    -   `min_delta`: Minimum change to qualify as an improvement.
-
-### Optimization Configuration (`optimize_template.yaml`)
-
--   `study_name`: Name for the Optuna study.
--   `trials`: Number of optimization trials to run.
--   `seed`: Random seed for the optimization sampler.
--   `metric`: Metric to optimize (e.g., `val_loss`).
--   `direction`: 'minimize' or 'maximize'.
--   `sampler`: Optuna sampler configuration.
-    -   `name`: Path to the sampler class (e.g., `optuna.samplers.TPESampler`).
-    -   `kwargs`: (Optional) Arguments for the sampler.
--   `pruner`: (Optional) Optuna pruner configuration.
-    -   `name`: Path to the pruner class (e.g., `pruner.PFLPruner`).
-    -   `kwargs`: Arguments for the pruner.
--   `search_space`: Defines hyperparameters to search. Nested under `net_config`, `optimizer_config`, etc.
-    -   `type`: 'int', 'float', or 'categorical'.
-    -   `min`, `max`: Range for numerical types.
-    -   `log`: `true` for logarithmic scale (float).
-    -   `step`: Step size (int).
-    -   `choices`: List of options (categorical).
-
-## Customization
-
-This template is designed for flexibility. Here’s how to customize different parts:
-
-### 1. Customizing Run Configurations
-
-Modify the parameters in a run configuration YAML file (like `configs/run_template.yaml`) to change experiment settings.
-
-**Example:** Let's create `configs/run_mlp_small_fastlr.yaml` based on `run_template.yaml` but with a smaller network and a different learning rate.
-
-*Original `configs/run_template.yaml` (simplified):*
 ```yaml
-# configs/run_template.yaml
 project: PyTorch_Template
 device: cuda:0
 net: model.MLP
-optimizer: torch.optim.adamw.AdamW
+optimizer: splus.SPlus
 scheduler: hyperbolic_lr.ExpHyperbolicLR
+criterion: torch.nn.MSELoss          # Any loss function via importlib
+criterion_config: {}                  # Arguments for criterion constructor
 epochs: 50
+batch_size: 256
 seeds: [89, 231, 928, 814, 269]
 net_config:
-  nodes: 64 # Original nodes
+  nodes: 64
   layers: 4
 optimizer_config:
-  lr: 1.e-3 # Original LR
+  lr: 1.e-3
+  eps: 1.e-10
 scheduler_config:
   upper_bound: 250
   max_iter: 50
   infimum_lr: 1.e-5
-...
-````
+early_stopping_config:
+  enabled: false
+  patience: 10
+  mode: min
+  min_delta: 0.0001
+checkpoint_config:
+  enabled: false
+  save_every_n_epochs: 10
+  keep_last_k: 3
+  save_best: true
+  monitor: val_loss
+  mode: min
+```
 
-*New `configs/run_mlp_small_fastlr.yaml`:*
+**Key fields:**
+
+| Field | Description |
+|-------|-------------|
+| `net` | Model class path in `module.Class` format |
+| `optimizer` | Optimizer class path (supports `torch.optim.*`, `splus.SPlus`, custom) |
+| `scheduler` | Scheduler class path (supports `torch.optim.lr_scheduler.*`, `hyperbolic_lr.*`, custom) |
+| `criterion` | Loss function class path (e.g., `torch.nn.MSELoss`, `torch.nn.CrossEntropyLoss`) |
+| `criterion_config` | Arguments passed to criterion constructor |
+| `seeds` | List of random seeds — each seed is a separate training run |
+| `checkpoint_config` | Periodic/best checkpoint saving with configurable policy |
+
+All module paths are resolved via `importlib` at runtime. The config is **frozen** after construction — use `config.with_overrides(field=value)` to create modified copies.
+
+### Optimization Configuration
+
+See [`configs/optimize_template.yaml`](configs/optimize_template.yaml) for the full template. Key sections: `search_space`, `sampler`, `pruner`.
+
+## Customization
+
+### Adding Custom Models
+
+Create a model class in `model.py` or a new file. The constructor must accept `(hparams: dict, device: str)`:
+
+```python
+# my_model.py
+class MyTransformer(nn.Module):
+    def __init__(self, hparams, device="cpu"):
+        super().__init__()
+        # hparams comes from net_config in YAML
+        ...
+```
 
 ```yaml
-# configs/run_mlp_small_fastlr.yaml
-project: PyTorch_Template_SmallMLP # Maybe change project name
-device: cuda:0
-net: model.MLP
-optimizer: torch.optim.adamw.AdamW
-scheduler: hyperbolic_lr.ExpHyperbolicLR # Or change scheduler
-epochs: 50
-seeds: [42, 123] # Use different seeds if desired
+net: my_model.MyTransformer
 net_config:
-  nodes: 32   # Changed nodes
-  layers: 3   # Changed layers
-optimizer_config:
-  lr: 5.e-3 # Changed learning rate
-scheduler_config: # Adjust scheduler params if needed, e.g., related to epochs or LR
+  d_model: 256
+  nhead: 8
+```
+
+### Adding Custom Callbacks
+
+Subclass `TrainingCallback` and override hook methods:
+
+```python
+# my_callbacks.py
+from callbacks import TrainingCallback
+
+class GradientClipCallback(TrainingCallback):
+    priority = 15  # Run early, after OptimizerMode
+
+    def __init__(self, max_norm=1.0):
+        self.max_norm = max_norm
+
+    def on_train_step_end(self, trainer, batch_idx, loss, **kwargs):
+        torch.nn.utils.clip_grad_norm_(trainer.model.parameters(), self.max_norm)
+```
+
+Then add it to the callback list in your training script or extend `run()`.
+
+### Adding Custom Metrics
+
+Register built-in names or importlib paths:
+
+```python
+from metrics import MetricRegistry
+
+registry = MetricRegistry(["mse", "mae", "r2", "my_module.MyCustomMetric"])
+results = registry.compute(y_pred, y_true)
+# {"mse": 0.012, "mae": 0.089, "r2": 0.95, "my_custom_metric": ...}
+```
+
+### Switching Loss Functions
+
+Change one line in YAML — no code changes:
+
+```yaml
+# Regression
+criterion: torch.nn.MSELoss
+
+# Classification
+criterion: torch.nn.CrossEntropyLoss
+
+# Custom
+criterion: my_losses.FocalLoss
+criterion_config:
+  gamma: 2.0
+  alpha: 0.25
+```
+
+### Using Different Schedulers
+
+```yaml
+# Built-in PyTorch
+scheduler: torch.optim.lr_scheduler.CosineAnnealingLR
+scheduler_config:
+  T_max: 50
+  eta_min: 1.e-5
+
+# Custom Hyperbolic (included)
+scheduler: hyperbolic_lr.ExpHyperbolicLR
+scheduler_config:
   upper_bound: 250
   max_iter: 50
   infimum_lr: 1.e-5
-... # Keep or adjust other settings like early_stopping
 ```
 
-Now you can run this specific configuration:
+### Customizing Data Loading
 
-```sh
-python main.py --run_config configs/run_mlp_small_fastlr.yaml
+Modify `load_data()` in `util.py` to return your `(train_dataset, val_dataset)`. See [`recipes/`](recipes/) for examples (regression + classification).
+
+## Example Recipes
+
+| Recipe | Task | Model | Loss | Config |
+|--------|------|-------|------|--------|
+| [`recipes/regression/`](recipes/regression/) | Sine wave fitting | MLP (64 nodes, 4 layers) | MSELoss | [config.yaml](recipes/regression/config.yaml) |
+| [`recipes/classification/`](recipes/classification/) | FashionMNIST | SimpleCNN (32 channels) | CrossEntropyLoss | [config.yaml](recipes/classification/config.yaml) |
+
+```bash
+python -m cli train recipes/regression/config.yaml --device cpu
 ```
 
-### 2. Customizing Optimization Search Space
+## CLI Reference
 
-Modify the `search_space` section in your optimization configuration file (e.g., `configs/optimize_template.yaml`) to change which hyperparameters Optuna searches over and their ranges/choices.
+| Command | Description |
+|---------|-------------|
+| `python -m cli train <config> [--device] [--optimize-config]` | Train model(s) with optional HPO |
+| `python -m cli validate <config>` | Validate config without training |
+| `python -m cli preview <config>` | Show model architecture and config summary |
+| `python -m cli doctor` | Check Python, PyTorch, CUDA, W&B, packages |
+| `python -m cli analyze [--project] [--group] [--seed] [--device]` | Analyze trained models |
 
-**Example:** Adjusting the search space in `configs/optimize_template.yaml`.
+## Documentation
 
-*Original `search_space` (simplified):*
+For a deeper dive into components and customization:
 
-```yaml
-# configs/optimize_template.yaml
-...
-search_space:
-  net_config:
-    nodes:
-      type: categorical
-      choices: [32, 64, 128] # Original choices
-    layers:
-      type: int
-      min: 3
-      max: 5 # Original max
-  optimizer_config:
-    lr:
-      type: float
-      min: 1.e-3 # Original min LR
-      max: 1.e-2
-      log: true
-  scheduler_config:
-    infimum_lr: # Only searching infimum_lr
-      type: float
-      min: 1.e-7
-      max: 1.e-4
-      log: true
-...
-```
-
-*Modified `search_space`:*
-
-```yaml
-# configs/optimize_template.yaml
-...
-search_space:
-  net_config:
-    nodes:
-      type: categorical
-      choices: [64, 128, 256] # Changed choices for nodes
-    layers:
-      type: int
-      min: 4 # Changed min layers
-      max: 6 # Changed max layers
-  optimizer_config:
-    lr:
-      type: float
-      min: 5.e-4 # Changed min LR
-      max: 5.e-3 # Changed max LR
-      log: true
-  scheduler_config:
-    # Add search for upper_bound
-    upper_bound:
-        type: int
-        min: 100
-        max: 300
-        step: 50
-    infimum_lr:
-      type: float
-      min: 1.e-6 # Changed range
-      max: 1.e-5
-      log: true
-...
-```
-
-This updated configuration will search over different node sizes, layer counts, learning rates, and scheduler parameters.
-
-### 3. Using Different Optuna Samplers (e.g., GridSampler)
-
-You can change the sampler used by Optuna by modifying the `sampler` section in `configs/optimize_template.yaml`.
-
-**Example:** Switching from `TPESampler` to `GridSampler`.
-
-*Original `sampler` section:*
-
-```yaml
-# configs/optimize_template.yaml
-...
-sampler:
-  name: optuna.samplers.TPESampler
-  #kwargs:
-  #  n_startup_trials: 10
-...
-```
-
-*Using `GridSampler`:*
-
-```yaml
-# configs/optimize_template.yaml
-...
-sampler:
-  name: optuna.samplers.GridSampler # Changed sampler name
-  # kwargs: {} # GridSampler often doesn't need kwargs here
-...
-# IMPORTANT CONDITION for GridSampler:
-# All parameters defined in the 'search_space' MUST be of type 'categorical'.
-# GridSampler explores all combinations of the categorical choices.
-# If your search_space contains 'int' or 'float' types, using GridSampler
-# will cause an error based on the current implementation in config.py.
-# (See _create_sampler and grid_search_space methods)
-
-# Example search_space compatible with GridSampler:
-search_space:
-  net_config:
-    nodes:
-      type: categorical
-      choices: [64, 128]
-    layers:
-      type: categorical # Must be categorical
-      choices: [3, 4]
-  optimizer_config:
-    lr:
-      type: categorical # Must be categorical
-      choices: [1.e-3, 5.e-3]
-  scheduler_config:
-    infimum_lr:
-      type: categorical # Must be categorical
-      choices: [1.e-5, 1.e-6]
-...
-```
-
-**Condition:** To use `GridSampler`, ensure *all* parameters listed under `search_space` have `type: categorical`. The code automatically constructs the required format for `GridSampler` but only if this condition is met.
-
-### 4. Adding Custom Models, Optimizers, Schedulers, Pruners
-
-  - **Models:** Create your model class (inheriting from `torch.nn.Module`) in `model.py` or a new Python file. Ensure its `__init__` method accepts a config dictionary (e.g., `net_config` from the YAML) as the first argument. Update the `net:` path in your run config YAML.
-  - **Optimizers/Schedulers:** Implement your custom classes or use existing ones from `torch.optim` or elsewhere (like `hyperbolic_lr.py`). Update the `optimizer:` or `scheduler:` path and `*_config` dictionaries in the YAML. The template uses `importlib` to load classes dynamically based on the paths provided.
-  - **Pruners:** Create your pruner class (inheriting from `pruner.BasePruner` or implementing the Optuna pruner interface) in `pruner.py` or a new file. Update the `pruner:` section in the optimization YAML.
-
-### 5. Customizing Data Loading
-
-  - Modify the `load_data` function in `util.py` to load your specific dataset. It should return PyTorch `Dataset` objects for training and validation.
-
-### 6. Customizing the Training Loop
-
-  - Modify the `Trainer` class in `util.py`. Adjust the `train_epoch`, `val_epoch`, and `train` methods for your specific task, loss functions, or metrics. Ensure the `train` method returns the value specified as the `metric` in your optimization config if applicable.
-
-## Analysis Script (`analyze.py`)
-
-The `analyze.py` script provides an interactive command-line interface to load and inspect results from completed runs.
-
-  - It uses helper functions from `util.py` (like `select_project`, `select_group`, `select_seed`, `load_model`, `load_study`, `load_best_model`) to navigate the saved runs in the `runs/` directory.
-  - You can easily extend the `main` function in `analyze.py` to perform more detailed analysis, plotting, or evaluation specific to your project needs.
+* **[Project Documentation](https://axect.github.io/pytorch_template)** (Generated by [Tutorial-Codebase-Knowledge](https://github.com/The-Pocket/Tutorial-Codebase-Knowledge))
 
 ## Contributing
 
-Contributions are welcome\! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
 
-When using this template for your own project, you are free to replace the license with one that best suits your needs. Ensure all dependencies and libraries used in your project comply with their respective licenses.
-
 ## Acknowledgments
 
-This template includes copies of external libraries and tools, such as:
-
 - [HyperbolicLR](https://github.com/Axect/HyperbolicLR) for hyperbolic curve based learning rate scheduling.
-
-- [SPlus](https://github.com/kvfrans/splus) for SPlus optimizer.
+- [SPlus](https://github.com/kvfrans/splus) for the SPlus optimizer.
 
 ## Appendix
 
@@ -434,38 +308,26 @@ This template includes copies of external libraries and tools, such as:
 
 ### Overview
 
-The PFL pruner (`pruner.PFLPruner`) is a custom pruner inspired by techniques to predict the final performance of a training run based on early-stage metrics. It helps optimize hyperparameter search by early stopping unpromising trials based on their predicted final loss (`pfl`).
-
-### Key Features
-
-  - Maintains a list of the `top_k` best-performing completed trials based on their final validation loss.
-  - For ongoing trials (after a warmup period), it predicts the final loss based on the current loss history.
-  - It compares the current trial's predicted final loss (`pfl`) with the minimum `pfl` observed among the `top_k` completed trials.
-  - Prunes the current trial if its predicted final loss is worse (lower, since `pfl` is -log10(loss)) than the worst `pfl` in the top-k list.
-  - Supports multi-seed runs by averaging metrics across seeds for decision making.
-  - Integrates with Optuna's study mechanism.
+The PFL pruner (`pruner.PFLPruner`) predicts the final performance of a training run based on early-stage metrics, pruning unpromising Optuna trials early.
 
 ### Configuration
 
-In your `optimize_template.yaml`, configure the pruner under the `pruner` section:
-
 ```yaml
 pruner:
-  name: pruner.PFLPruner # Path to the pruner class
+  name: pruner.PFLPruner
   kwargs:
-    n_startup_trials: 10    # Number of trials to complete before pruning starts
-    n_warmup_epochs: 10     # Number of epochs within a trial before pruning is considered
-    top_k: 10               # Number of best completed trials to keep track of
-    target_epoch: 50        # The target epoch used for predicting final loss
+    n_startup_trials: 10
+    n_warmup_epochs: 10
+    top_k: 10
+    target_epoch: 50
 ```
 
 ### How It Works
 
-1.  The first `n_startup_trials` run to completion without being pruned to establish baseline performance.
-2.  For subsequent trials, pruning is considered only after `n_warmup_epochs`.
-3.  The pruner calculates the average predicted final loss (`pfl`) for the current trial based on the loss history across its seeds.
-4.  It compares this `pfl` to the `pfl` values of the `top_k` trials that have already completed.
-5.  If the current trial's `pfl` is lower than the minimum `pfl` recorded among the top completed trials, the trial is pruned (as lower `pfl` indicates worse predicted performance).
-6.  When a trial completes, its final validation loss and `pfl` are considered for inclusion in the `top_k` list.
+1. The first `n_startup_trials` run to completion to establish baseline performance.
+2. For subsequent trials, pruning is considered only after `n_warmup_epochs`.
+3. The pruner predicts final loss from the current loss history using exponential curve fitting.
+4. If the predicted final loss is worse than the top-k completed trials, the trial is pruned.
+5. Supports multi-seed runs by averaging metrics across seeds.
 
 </details>

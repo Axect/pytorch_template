@@ -23,8 +23,27 @@ class HyperbolicLR:
         self.upper_bound = upper_bound
         self.max_iter = max_iter
         self.init_lr = init_lr
+        self.infimum_lr = infimum_lr
         self.delta_lr = init_lr - infimum_lr
         self.iter = 0
+
+    def state_dict(self):
+        return {
+            "iter": self.iter,
+            "init_lr": self.init_lr,
+            "infimum_lr": self.infimum_lr,
+            "upper_bound": self.upper_bound,
+            "max_iter": self.max_iter,
+            "delta_lr": self.delta_lr,
+        }
+
+    def load_state_dict(self, state_dict):
+        self.iter = state_dict["iter"]
+        self.init_lr = state_dict["init_lr"]
+        self.infimum_lr = state_dict.get("infimum_lr", self.init_lr - state_dict["delta_lr"])
+        self.upper_bound = state_dict["upper_bound"]
+        self.max_iter = state_dict["max_iter"]
+        self.delta_lr = state_dict["delta_lr"]
 
     def step(self):
         """
@@ -87,8 +106,27 @@ class ExpHyperbolicLR:
         self.upper_bound = upper_bound
         self.max_iter = max_iter
         self.init_lr = init_lr
+        self.infimum_lr = infimum_lr
         self.lr_ratio = init_lr / infimum_lr
         self.iter = 0
+
+    def state_dict(self):
+        return {
+            "iter": self.iter,
+            "init_lr": self.init_lr,
+            "infimum_lr": self.infimum_lr,
+            "upper_bound": self.upper_bound,
+            "max_iter": self.max_iter,
+            "lr_ratio": self.lr_ratio,
+        }
+
+    def load_state_dict(self, state_dict):
+        self.iter = state_dict["iter"]
+        self.init_lr = state_dict["init_lr"]
+        self.infimum_lr = state_dict.get("infimum_lr", self.init_lr / state_dict["lr_ratio"])
+        self.upper_bound = state_dict["upper_bound"]
+        self.max_iter = state_dict["max_iter"]
+        self.lr_ratio = state_dict["lr_ratio"]
 
     def step(self):
         """

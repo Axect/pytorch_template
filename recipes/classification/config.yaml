@@ -1,0 +1,30 @@
+project: Classification_Recipe
+device: cpu
+net: recipes.classification.model.SimpleCNN
+optimizer: torch.optim.AdamW
+scheduler: torch.optim.lr_scheduler.CosineAnnealingLR
+criterion: torch.nn.CrossEntropyLoss
+criterion_config: {}
+epochs: 10
+batch_size: 128
+seeds: [42]
+net_config:
+  channels: 32
+  num_classes: 10
+optimizer_config:
+  lr: 1.e-3
+scheduler_config:
+  T_max: 10
+  eta_min: 1.e-5
+early_stopping_config:
+  enabled: false
+  patience: 5
+  mode: min
+  min_delta: 0.001
+checkpoint_config:
+  enabled: false
+  save_every_n_epochs: 5
+  keep_last_k: 2
+  save_best: true
+  monitor: val_loss
+  mode: min

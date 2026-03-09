@@ -1,0 +1,30 @@
+project: Regression_Recipe
+device: cpu
+net: recipes.regression.model.MLP
+optimizer: torch.optim.AdamW
+scheduler: torch.optim.lr_scheduler.CosineAnnealingLR
+criterion: torch.nn.MSELoss
+criterion_config: {}
+epochs: 20
+batch_size: 256
+seeds: [42]
+net_config:
+  nodes: 64
+  layers: 4
+optimizer_config:
+  lr: 1.e-3
+scheduler_config:
+  T_max: 20
+  eta_min: 1.e-5
+early_stopping_config:
+  enabled: false
+  patience: 10
+  mode: min
+  min_delta: 0.0001
+checkpoint_config:
+  enabled: false
+  save_every_n_epochs: 10
+  keep_last_k: 3
+  save_best: true
+  monitor: val_loss
+  mode: min

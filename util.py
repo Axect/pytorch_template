@@ -1,6 +1,5 @@
 import torch
 from torch.utils.data import TensorDataset, random_split
-import torch.nn.functional as F
 import numpy as np
 import beaupy
 from rich.console import Console
@@ -9,10 +8,18 @@ import optuna
 from tqdm import tqdm
 
 from config import RunConfig
+from callbacks import (
+    CallbackRunner, OptimizerModeCallback, EarlyStoppingCallback,
+    WandbLoggingCallback, PrunerCallback, LossPredictionCallback,
+    NaNDetectionCallback, CheckpointCallback,
+)
+from checkpoint import CheckpointManager, SeedManifest
+from provenance import save_provenance, compute_config_hash
 
 import random
 import os
 import math
+import time
 from math import pi
 
 
@@ -60,38 +67,6 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-class EarlyStopping:
-    def __init__(self, patience=10, mode="min", min_delta=0):
-        self.patience = patience
-        self.mode = mode
-        self.min_delta = min_delta
-        self.counter = 0
-        self.best_loss = None
-        self.early_stop = False
-
-    def __call__(self, val_loss):
-        if self.best_loss is None:
-            self.best_loss = val_loss
-            return False
-
-        if self.mode == "min":
-            if val_loss <= self.best_loss * (1 - self.min_delta):
-                self.best_loss = val_loss
-                self.counter = 0
-            else:
-                self.counter += 1
-        else:  # mode == "max"
-            if val_loss >= self.best_loss * (1 + self.min_delta):
-                self.best_loss = val_loss
-                self.counter = 0
-            else:
-                self.counter += 1
-
-        if self.counter >= self.patience:
-            self.early_stop = True
-            return True
-        return False
-
 
 def predict_final_loss(losses, max_epochs):
     if len(losses) < 10:
@@ -125,45 +100,31 @@ class Trainer:
         optimizer,
         scheduler,
         criterion,
-        early_stopping_config=None,
+        callbacks=None,
         device="cpu",
-        trial=None,
-        seed=None,
-        pruner=None,
     ):
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
         self.device = device
-        self.trial = trial
-        self.seed = seed
-        self.pruner = pruner
-
-        if early_stopping_config and early_stopping_config.enabled:
-            self.early_stopping = EarlyStopping(
-                patience=early_stopping_config.patience,
-                mode=early_stopping_config.mode,
-                min_delta=early_stopping_config.min_delta,
-            )
-        else:
-            self.early_stopping = None
+        self.callbacks = callbacks if callbacks is not None else CallbackRunner()
+        self._total_epochs = 0
+        self._loss_prediction = None
 
     def step(self, x):
         return self.model(x)
 
     def train_epoch(self, dl_train, epoch=None, total_epochs=None):
         self.model.train()
-        # ScheduleFree Optimizer or SPlus
-        if any(keyword in self.optimizer.__class__.__name__ for keyword in ["ScheduleFree", "SPlus"]):
-            self.optimizer.train()
+        self.callbacks.fire("on_train_epoch_begin", trainer=self, epoch=epoch)
         train_loss = 0
         total_size = 0
 
         # Create progress bar description
         desc = f"Epoch {epoch+1}/{total_epochs}" if epoch is not None and total_epochs is not None else "Training"
 
-        for x, y in tqdm(dl_train, desc=desc, leave=False):
+        for batch_idx, (x, y) in enumerate(tqdm(dl_train, desc=desc, leave=False)):
             x = x.to(self.device)
             y = y.to(self.device)
             y_pred = self.step(x)
@@ -173,81 +134,58 @@ class Trainer:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            self.callbacks.fire("on_train_step_end", trainer=self, batch_idx=batch_idx, loss=loss.item())
         train_loss /= total_size
         return train_loss
 
-    def val_epoch(self, dl_val):
+    def val_epoch(self, dl_val, epoch=None):
         self.model.eval()
-        # ScheduleFree Optimizer or SPlus
-        if any(keyword in self.optimizer.__class__.__name__ for keyword in ["ScheduleFree", "SPlus"]):
-            self.optimizer.eval()
+        self.callbacks.fire("on_val_begin", trainer=self, epoch=epoch)
         val_loss = 0
         total_size = 0
-        for x, y in tqdm(dl_val, desc="Validation", leave=False):
-            x = x.to(self.device)
-            y = y.to(self.device)
-            y_pred = self.step(x)
-            loss = self.criterion(y_pred, y)
-            val_loss += loss.item() * x.shape[0]
-            total_size += x.shape[0]
+        with torch.inference_mode():
+            for x, y in tqdm(dl_val, desc="Validation", leave=False):
+                x = x.to(self.device)
+                y = y.to(self.device)
+                y_pred = self.step(x)
+                loss = self.criterion(y_pred, y)
+                val_loss += loss.item() * x.shape[0]
+                total_size += x.shape[0]
         val_loss /= total_size
+        self.callbacks.fire("on_val_end", trainer=self, epoch=epoch, val_loss=val_loss, metrics={})
         return val_loss
 
     def train(self, dl_train, dl_val, epochs):
+        self._total_epochs = epochs
+        self.callbacks.fire("on_train_begin", trainer=self, epochs=epochs)
         val_loss = 0
-        val_losses = []
 
         for epoch in tqdm(range(epochs), desc="Overall Progress"):
             train_loss = self.train_epoch(dl_train, epoch=epoch, total_epochs=epochs)
-            val_loss = self.val_epoch(dl_val)
-            val_losses.append(val_loss)
+            val_loss = self.val_epoch(dl_val, epoch=epoch)
 
-            # Early stopping if loss becomes NaN
-            if math.isnan(train_loss) or math.isnan(val_loss):
-                tqdm.write("Early stopping due to NaN loss")
-                val_loss = math.inf
+            self.callbacks.fire(
+                "on_epoch_end", trainer=self, epoch=epoch,
+                train_loss=train_loss, val_loss=val_loss, metrics={},
+            )
+
+            # Check callback signals
+            break_flag = False
+            for cb in self.callbacks.callbacks:
+                if isinstance(cb, NaNDetectionCallback) and cb.nan_detected:
+                    val_loss = math.inf
+                    break_flag = True
+                    break
+                if isinstance(cb, EarlyStoppingCallback) and cb.should_stop:
+                    tqdm.write(f"Early stopping triggered at epoch {epoch}")
+                    break_flag = True
+                    break
+            if break_flag:
                 break
 
-            # Early stopping check
-            if self.early_stopping is not None:
-                if self.early_stopping(val_loss):
-                    tqdm.write(f"Early stopping triggered at epoch {epoch}")
-                    break
-
-            log_dict = {
-                "train_loss": train_loss,
-                "val_loss": val_loss,
-                "lr": self.optimizer.param_groups[0]["lr"],
-            }
-
-            if epoch >= 10:
-                log_dict["predicted_final_loss"] = predict_final_loss(
-                    val_losses, epochs
-                )
-
-            # Pruning check
-            if (
-                self.pruner is not None
-                and self.trial is not None
-                and self.seed is not None
-            ):
-                self.pruner.report(
-                    trial_id=self.trial.number,
-                    seed=self.seed,
-                    epoch=epoch,
-                    value=val_loss,
-                )
-                if self.pruner.should_prune():
-                    raise optuna.TrialPruned()
-
             self.scheduler.step()
-            wandb.log(log_dict)
-            if epoch % 10 == 0 or epoch == epochs - 1:
-                print_str = f"epoch: {epoch}"
-                for key, value in log_dict.items():
-                    print_str += f", {key}: {value:.4e}"
-                tqdm.write(print_str)
 
+        self.callbacks.fire("on_train_end", trainer=self)
         return val_loss
 
 
@@ -270,10 +208,19 @@ def run(
     if pruner is not None and trial is not None and hasattr(pruner, "register_trial"):
         pruner.register_trial(trial.number)
 
-    total_loss = 0
-    complete_seeds = 0
+    # Create seed manifest for multi-seed resume support
+    manifest = SeedManifest(group_path)
+
+    # Create criterion from config
+    criterion = run_config.create_criterion()
+
     try:
         for seed in seeds:
+            # Skip already-completed seeds
+            if manifest.is_complete(seed):
+                tqdm.write(f"Seed {seed} already complete, skipping")
+                continue
+
             set_seed(seed)
 
             model = run_config.create_model().to(device)
@@ -289,27 +236,64 @@ def run(
                 config=run_config.gen_config(),
             )
 
+            # Build callbacks list
+            callbacks_list = [
+                OptimizerModeCallback(),
+                NaNDetectionCallback(),
+                LossPredictionCallback(run_config.epochs),
+                WandbLoggingCallback(),
+            ]
+            if run_config.early_stopping_config and run_config.early_stopping_config.enabled:
+                callbacks_list.append(
+                    EarlyStoppingCallback(
+                        patience=run_config.early_stopping_config.patience,
+                        mode=run_config.early_stopping_config.mode,
+                        min_delta=run_config.early_stopping_config.min_delta,
+                    )
+                )
+            if pruner is not None and trial is not None:
+                callbacks_list.append(PrunerCallback(pruner, trial, seed))
+
+            # Create CheckpointManager if enabled
+            run_path = f"{group_path}/{run_name}"
+            if not os.path.exists(run_path):
+                os.makedirs(run_path)
+
+            if run_config.checkpoint_config.enabled:
+                config_hash = compute_config_hash(run_config)
+                ckpt_manager = CheckpointManager(
+                    run_dir=run_path,
+                    save_every_n=run_config.checkpoint_config.save_every_n_epochs,
+                    keep_last_k=run_config.checkpoint_config.keep_last_k,
+                    save_best=run_config.checkpoint_config.save_best,
+                    monitor=run_config.checkpoint_config.monitor,
+                    mode=run_config.checkpoint_config.mode,
+                )
+                callbacks_list.append(CheckpointCallback(ckpt_manager, config_hash))
+
+            callback_runner = CallbackRunner(callbacks_list)
+
             trainer = Trainer(
                 model,
                 optimizer,
                 scheduler,
-                criterion=F.mse_loss,
-                early_stopping_config=run_config.early_stopping_config,
+                criterion=criterion,
+                callbacks=callback_runner,
                 device=device,
-                trial=trial,
-                seed=seed,
-                pruner=pruner,
             )
 
+            start_time = time.time()
             val_loss = trainer.train(dl_train, dl_val, epochs=run_config.epochs)
-            total_loss += val_loss
-            complete_seeds += 1
+            end_time = time.time()
 
             # Save model & configs
-            run_path = f"{group_path}/{run_name}"
-            if not os.path.exists(run_path):
-                os.makedirs(run_path)
             torch.save(model.state_dict(), f"{run_path}/model.pt")
+
+            # Save provenance
+            save_provenance(run_path, run_config, model, device, start_time, end_time)
+
+            # Mark seed as complete
+            manifest.mark_complete(seed, val_loss)
 
             wandb.finish()
 
@@ -333,7 +317,8 @@ def run(
         ):
             pruner.complete_trial(trial.number)
 
-    return total_loss / (complete_seeds if complete_seeds > 0 else 1)
+    complete_count = manifest.get_complete_count()
+    return manifest.get_total_loss() / (complete_count if complete_count > 0 else 1)
 
 
 # ┌──────────────────────────────────────────────────────────┐

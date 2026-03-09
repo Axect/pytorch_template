@@ -1,7 +1,6 @@
 project: PyTorch_Template
 device: cuda:0
 net: model.MLP
-optimizer: torch.optim.adamw.AdamW
 optimizer: splus.SPlus
 scheduler: hyperbolic_lr.ExpHyperbolicLR
 epochs: 50
@@ -17,8 +16,17 @@ scheduler_config:
   upper_bound: 250
   max_iter: 50
   infimum_lr: 1.e-5
+criterion: torch.nn.MSELoss
+criterion_config: {}
 early_stopping_config:
   enabled: false
   patience: 10
   mode: min # 'min' or 'max'
   min_delta: 0.0001 # Percent
+checkpoint_config:
+  enabled: false
+  save_every_n_epochs: 10
+  keep_last_k: 3
+  save_best: true
+  monitor: val_loss
+  mode: min

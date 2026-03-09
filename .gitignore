@@ -7,3 +7,4 @@ runs/
 runs
 wandb/
 __pycache__/
+outputs/
