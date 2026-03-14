@@ -1,8 +1,8 @@
 project: PyTorch_Template
 device: cuda:0
 net: model.MLP
-optimizer: splus.SPlus
-scheduler: hyperbolic_lr.ExpHyperbolicLR
+optimizer: pytorch_optimizer.SPlus
+scheduler: pytorch_scheduler.ExpHyperbolicLRScheduler
 epochs: 50
 batch_size: 256
 seeds: [89, 231, 928, 814, 269]
@@ -13,9 +13,9 @@ optimizer_config:
   lr: 1.e-3 # Must contain dot for float
   eps: 1.e-10
 scheduler_config:
+  total_steps: 50
   upper_bound: 250
-  max_iter: 50
-  infimum_lr: 1.e-5
+  min_lr: 1.e-5
 criterion: torch.nn.MSELoss
 criterion_config: {}
 early_stopping_config:

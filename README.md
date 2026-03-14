@@ -51,7 +51,7 @@ Adding custom behavior is as simple as subclassing `TrainingCallback` and adding
 2.  **Install dependencies** ([uv](https://github.com/astral-sh/uv) recommended):
     ```bash
     uv venv && source .venv/bin/activate
-    uv pip install -U torch wandb rich beaupy numpy optuna matplotlib scienceplots typer tqdm pyyaml
+    uv pip install -U torch wandb rich beaupy numpy optuna matplotlib scienceplots typer tqdm pyyaml pytorch-optimizer pytorch-scheduler
     ```
 
 3.  **Validate your setup:**
@@ -98,9 +98,7 @@ pytorch_template/
 ├── checkpoint.py          # CheckpointManager + SeedManifest
 ├── provenance.py          # Environment capture + config hashing
 ├── model.py               # Model architectures (MLP)
-├── hyperbolic_lr.py       # HyperbolicLR + ExpHyperbolicLR schedulers
 ├── pruner.py              # PFL pruner for Optuna
-├── splus.py               # SPlus optimizer
 ├── configs/
 │   ├── run_template.yaml
 │   └── optimize_template.yaml
@@ -119,8 +117,8 @@ pytorch_template/
 project: PyTorch_Template
 device: cuda:0
 net: model.MLP
-optimizer: splus.SPlus
-scheduler: hyperbolic_lr.ExpHyperbolicLR
+optimizer: pytorch_optimizer.SPlus
+scheduler: pytorch_scheduler.ExpHyperbolicLRScheduler
 criterion: torch.nn.MSELoss          # Any loss function via importlib
 criterion_config: {}                  # Arguments for criterion constructor
 epochs: 50
@@ -133,9 +131,9 @@ optimizer_config:
   lr: 1.e-3
   eps: 1.e-10
 scheduler_config:
+  total_steps: 50
   upper_bound: 250
-  max_iter: 50
-  infimum_lr: 1.e-5
+  min_lr: 1.e-5
 early_stopping_config:
   enabled: false
   patience: 10
@@ -155,8 +153,8 @@ checkpoint_config:
 | Field | Description |
 |-------|-------------|
 | `net` | Model class path in `module.Class` format |
-| `optimizer` | Optimizer class path (supports `torch.optim.*`, `splus.SPlus`, custom) |
-| `scheduler` | Scheduler class path (supports `torch.optim.lr_scheduler.*`, `hyperbolic_lr.*`, custom) |
+| `optimizer` | Optimizer class path (supports `torch.optim.*`, `pytorch_optimizer.*`, custom) |
+| `scheduler` | Scheduler class path (supports `torch.optim.lr_scheduler.*`, `pytorch_scheduler.*`, custom) |
 | `criterion` | Loss function class path (e.g., `torch.nn.MSELoss`, `torch.nn.CrossEntropyLoss`) |
 | `criterion_config` | Arguments passed to criterion constructor |
 | `seeds` | List of random seeds — each seed is a separate training run |
@@ -249,12 +247,12 @@ scheduler_config:
   T_max: 50
   eta_min: 1.e-5
 
-# Custom Hyperbolic (included)
-scheduler: hyperbolic_lr.ExpHyperbolicLR
+# ExpHyperbolicLR (via pytorch-scheduler)
+scheduler: pytorch_scheduler.ExpHyperbolicLRScheduler
 scheduler_config:
+  total_steps: 50
   upper_bound: 250
-  max_iter: 50
-  infimum_lr: 1.e-5
+  min_lr: 1.e-5
 ```
 
 ### Customizing Data Loading
@@ -298,8 +296,8 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgments
 
-- [HyperbolicLR](https://github.com/Axect/HyperbolicLR) for hyperbolic curve based learning rate scheduling.
-- [SPlus](https://github.com/kvfrans/splus) for the SPlus optimizer.
+- [pytorch-optimizer](https://github.com/kozistr/pytorch_optimizer) for optimizers including SPlus.
+- [pytorch-scheduler](https://github.com/Axect/pytorch_scheduler) for learning rate schedulers including ExpHyperbolicLR.
 
 ## Appendix
 
