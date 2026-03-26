@@ -108,6 +108,12 @@ class WandbLoggingCallback(TrainingCallback):
         }
         log_dict.update(metrics)
 
+        if hasattr(trainer, '_max_grad_norm') and trainer._max_grad_norm is not None:
+            log_dict["max_grad_norm"] = trainer._max_grad_norm
+
+        if hasattr(trainer, '_overfit_gap_ratio') and trainer._overfit_gap_ratio is not None:
+            log_dict["overfit_gap_ratio"] = trainer._overfit_gap_ratio
+
         if hasattr(trainer, '_loss_prediction') and trainer._loss_prediction is not None:
             log_dict["predicted_final_loss"] = trainer._loss_prediction
 
@@ -173,6 +179,88 @@ class NaNDetectionCallback(TrainingCallback):
             from tqdm import tqdm
             tqdm.write("Early stopping due to NaN loss")
             self.nan_detected = True
+
+
+class GradientMonitorCallback(TrainingCallback):
+    """Monitors gradient norms to detect exploding gradients."""
+    priority = 12  # After OptimizerModeCallback (10)
+
+    def __init__(self, warn_threshold: float = 1e4):
+        self.warn_threshold = warn_threshold
+        self._step_grad_norms: list[float] = []
+        self.epoch_max_grad_norms: list[float] = []
+        self._current_epoch_max = 0.0
+
+    def on_train_epoch_begin(self, trainer, epoch, **kwargs):
+        self._step_grad_norms = []
+        self._current_epoch_max = 0.0
+
+    def on_train_step_end(self, trainer, batch_idx, loss, **kwargs):
+        total_norm = 0.0
+        for param in trainer.model.parameters():
+            if param.grad is not None:
+                total_norm += param.grad.norm().item() ** 2
+        total_norm = total_norm ** 0.5
+
+        self._step_grad_norms.append(total_norm)
+        self._current_epoch_max = max(self._current_epoch_max, total_norm)
+
+        if total_norm > self.warn_threshold:
+            from tqdm import tqdm
+            tqdm.write(
+                f"[GradientMonitor] grad norm {total_norm:.2e} "
+                f"exceeds threshold {self.warn_threshold:.2e} at batch {batch_idx}"
+            )
+
+    def on_epoch_end(self, trainer, epoch, train_loss, val_loss, metrics, **kwargs):
+        self.epoch_max_grad_norms.append(self._current_epoch_max)
+        trainer._max_grad_norm = self._current_epoch_max
+
+
+class OverfitDetectionCallback(TrainingCallback):
+    """Detects overfitting by monitoring train/val loss divergence."""
+    priority = 75  # After LossPredictionCallback (70)
+
+    def __init__(self, warmup_epochs: int = 5, window_size: int = 5):
+        self.warmup_epochs = warmup_epochs
+        self.window_size = window_size
+        self.train_losses: list[float] = []
+        self.val_losses: list[float] = []
+        self.overfit_detected = False
+
+    def on_epoch_end(self, trainer, epoch, train_loss, val_loss, metrics, **kwargs):
+        self.train_losses.append(train_loss)
+        self.val_losses.append(val_loss)
+
+        if epoch < self.warmup_epochs or len(self.train_losses) < self.window_size:
+            trainer._overfit_gap_ratio = None
+            return
+
+        recent_train = self.train_losses[-self.window_size:]
+        recent_val = self.val_losses[-self.window_size:]
+
+        # Detect sustained divergence: train decreasing AND val increasing
+        train_decreasing = all(
+            recent_train[i] >= recent_train[i + 1]
+            for i in range(len(recent_train) - 1)
+        )
+        val_increasing = all(
+            recent_val[i] <= recent_val[i + 1]
+            for i in range(len(recent_val) - 1)
+        )
+
+        if train_decreasing and val_increasing:
+            self.overfit_detected = True
+            gap_ratio = recent_val[-1] / recent_train[-1] if recent_train[-1] > 0 else float("inf")
+            from tqdm import tqdm
+            tqdm.write(
+                f"[OverfitDetection] epoch {epoch}: "
+                f"train_loss decreasing, val_loss increasing "
+                f"(gap ratio: {gap_ratio:.2f})"
+            )
+            trainer._overfit_gap_ratio = gap_ratio
+        else:
+            trainer._overfit_gap_ratio = None
 
 
 class CheckpointCallback(TrainingCallback):

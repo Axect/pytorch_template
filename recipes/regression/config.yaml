@@ -5,6 +5,7 @@ optimizer: torch.optim.AdamW
 scheduler: torch.optim.lr_scheduler.CosineAnnealingLR
 criterion: torch.nn.MSELoss
 criterion_config: {}
+data: recipes.regression.data.load_data
 epochs: 20
 batch_size: 256
 seeds: [42]

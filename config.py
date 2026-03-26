@@ -64,6 +64,7 @@ class RunConfig:
     )
     criterion: str = "torch.nn.MSELoss"
     criterion_config: dict = field(default_factory=dict)
+    data: str = "util.load_data"
     checkpoint_config: CheckpointConfig = field(
         default_factory=lambda: CheckpointConfig()
     )
@@ -95,6 +96,12 @@ class RunConfig:
                     f"{name} must be in module.Class format (contain at least one '.'), "
                     f"got '{path}'"
                 )
+
+        if self.data and "." not in self.data:
+            raise ValueError(
+                f"data must be in module.function format (contain at least one '.'), "
+                f"got '{self.data}'"
+            )
 
         if self.early_stopping_config.enabled:
             if self.early_stopping_config.patience <= 0:
@@ -135,6 +142,7 @@ class RunConfig:
             ("optimizer", self.optimizer),
             ("scheduler", self.scheduler),
             ("criterion", self.criterion),
+            ("data", self.data),
         ]:
             module_name, class_name = dotted_path.rsplit(".", 1)
             try:
@@ -148,6 +156,52 @@ class RunConfig:
                     f"Module '{module_name}' has no attribute '{class_name}' "
                     f"(for {label})"
                 )
+
+    def validate_semantics(self) -> list[str]:
+        """Tier 3 — semantic validation: check logical relationships between config values.
+
+        Returns list of warning strings. Empty list means all checks passed.
+        """
+        issues = []
+
+        # Check optimizer lr is positive
+        lr = self.optimizer_config.get("lr")
+        if lr is not None and lr <= 0:
+            issues.append(f"optimizer_config.lr must be positive, got {lr}")
+
+        # Check seeds are unique
+        if len(self.seeds) != len(set(self.seeds)):
+            issues.append(f"seeds contains duplicates: {self.seeds}")
+
+        # Scheduler-specific checks
+        scheduler_class = self.scheduler.rsplit(".", 1)[-1]
+
+        if scheduler_class in ("ExpHyperbolicLRScheduler", "HyperbolicLRScheduler"):
+            total_steps = self.scheduler_config.get("total_steps")
+            upper_bound = self.scheduler_config.get("upper_bound")
+            if total_steps is not None and upper_bound is not None:
+                if upper_bound < total_steps:
+                    issues.append(
+                        f"scheduler upper_bound ({upper_bound}) must be >= "
+                        f"total_steps ({total_steps}) for {scheduler_class}"
+                    )
+
+        if scheduler_class == "CosineAnnealingLR":
+            t_max = self.scheduler_config.get("T_max")
+            if t_max is not None and t_max != self.epochs:
+                issues.append(
+                    f"CosineAnnealingLR T_max ({t_max}) != epochs ({self.epochs})"
+                )
+
+        # Check early stopping patience vs epochs
+        if self.early_stopping_config.enabled:
+            if self.early_stopping_config.patience >= self.epochs:
+                issues.append(
+                    f"early_stopping patience ({self.early_stopping_config.patience}) >= "
+                    f"epochs ({self.epochs}) — early stopping will never trigger"
+                )
+
+        return issues
 
     def with_overrides(self, **kwargs) -> 'RunConfig':
         """Return a new RunConfig with the given fields replaced (deep-merge dicts)."""
@@ -193,6 +247,13 @@ class RunConfig:
         module = importlib.import_module(module_name)
         criterion_class = getattr(module, class_name)
         return criterion_class(**self.criterion_config)
+
+    def load_data(self):
+        """Load data using the configured data module path."""
+        module_name, func_name = self.data.rsplit(".", 1)
+        module = importlib.import_module(module_name)
+        load_fn = getattr(module, func_name)
+        return load_fn()
 
     def gen_group_name(self):
         name = f"{self.net.split('.')[-1]}"

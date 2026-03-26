@@ -5,9 +5,13 @@ Usage:
     python cli.py train config.yaml
     python cli.py validate config.yaml
     python cli.py preview config.yaml
+    python cli.py preflight config.yaml
     python cli.py doctor
     python cli.py analyze --project MyProject --group exp1 --seed 42
+    python cli.py hpo-report --db MyProject_Opt.db
 """
+
+import json as json_lib
 
 import typer
 from rich.console import Console
@@ -15,6 +19,84 @@ from rich.table import Table
 
 app = typer.Typer(help="PyTorch Template CLI")
 console = Console()
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _render_preflight_results(results: dict, json_output: bool):
+    if json_output:
+        console.print(json_lib.dumps(results, indent=2))
+        return
+
+    table = Table(title="Pre-flight Check", show_lines=True)
+    table.add_column("Check", style="bold cyan")
+    table.add_column("Status")
+    table.add_column("Detail")
+
+    for check in results["checks"]:
+        status = check["status"]
+        if status == "PASS":
+            status_str = "[bold green]PASS[/bold green]"
+        elif status == "WARN":
+            status_str = "[bold yellow]WARN[/bold yellow]"
+        else:
+            status_str = "[bold red]FAIL[/bold red]"
+        table.add_row(check["name"], status_str, check.get("detail", ""))
+
+    console.print(table)
+
+    if results["passed"]:
+        console.print("[bold green]All pre-flight checks passed.[/bold green]")
+    else:
+        console.print("[bold red]Pre-flight check FAILED.[/bold red]")
+
+
+def _render_hpo_report(report: dict):
+    console.print(f"\n[bold]Study:[/bold] {report['study_name']} ({report['db']})")
+
+    stats = report["stats"]
+    console.print(
+        f"Trials: {stats['total']} total, "
+        f"[green]{stats['completed']} completed[/green], "
+        f"[yellow]{stats['pruned']} pruned[/yellow], "
+        f"[red]{stats['failed']} failed[/red]"
+    )
+
+    best = report["best_trial"]
+    console.print(f"\n[bold green]Best Trial #{best['number']}[/bold green]")
+    console.print(f"  Value: {best['value']}")
+    console.print(f"  Group: {best['group_name']}")
+    for k, v in best["params"].items():
+        console.print(f"  {k}: {v}")
+
+    if report["importances"]:
+        imp_table = Table(title="Parameter Importance", show_lines=True)
+        imp_table.add_column("Parameter", style="bold cyan")
+        imp_table.add_column("Importance")
+        for param, importance in report["importances"].items():
+            bar = "\u2588" * int(importance * 30)
+            imp_table.add_row(param, f"{importance:.4f} {bar}")
+        console.print(imp_table)
+
+    if report["boundary_warnings"]:
+        console.print("\n[bold yellow]Boundary Warnings:[/bold yellow]")
+        for warn in report["boundary_warnings"]:
+            console.print(f"  [yellow]{warn}[/yellow]")
+
+    if report["top_k"]:
+        top_table = Table(title=f"Top {len(report['top_k'])} Trials", show_lines=True)
+        top_table.add_column("#", style="bold")
+        top_table.add_column("Value")
+        param_keys = list(report["top_k"][0]["params"].keys())
+        for key in param_keys:
+            top_table.add_column(key)
+        for t in report["top_k"]:
+            row = [str(t["number"]), f"{t['value']:.6f}"]
+            for key in param_keys:
+                val = t["params"].get(key, "")
+                row.append(f"{val:.4e}" if isinstance(val, float) else str(val))
+            top_table.add_row(*row)
+        console.print(top_table)
 
 
 @app.command()
@@ -28,14 +110,14 @@ def train(
         from torch.utils.data import DataLoader
 
         from config import RunConfig, OptimizeConfig
-        from util import load_data, run
+        from util import run
 
         base_config = RunConfig.from_yaml(run_config)
 
         if device:
             base_config = base_config.with_overrides(device=device)
 
-        ds_train, ds_val = load_data()
+        ds_train, ds_val = base_config.load_data()
         dl_train = DataLoader(ds_train, batch_size=base_config.batch_size, shuffle=True)
         dl_val = DataLoader(ds_val, batch_size=base_config.batch_size, shuffle=False)
 
@@ -100,6 +182,136 @@ def validate(
 
     except Exception as e:
         console.print(f"[bold red]FAIL[/bold red] — {e}")
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def preflight(
+    run_config: str = typer.Argument(..., help="Path to the YAML config file"),
+    device: str = typer.Option(None, help="Device override (e.g. 'cuda:0' or 'cpu')"),
+    json_output: bool = typer.Option(False, "--json", help="Output results as JSON"),
+):
+    """Pre-flight check: validate config, instantiate objects, run 1 batch forward+backward."""
+    import torch
+    from torch.utils.data import DataLoader
+    from config import RunConfig
+
+    results: dict = {"checks": [], "passed": True, "gpu_memory_mb": None}
+
+    def add_check(name, status, detail=""):
+        results["checks"].append({"name": name, "status": status, "detail": detail})
+        if status == "FAIL":
+            results["passed"] = False
+
+    try:
+        config = RunConfig.from_yaml(run_config)
+        if device:
+            config = config.with_overrides(device=device)
+    except Exception as e:
+        add_check("Config loading", "FAIL", str(e))
+        _render_preflight_results(results, json_output)
+        raise typer.Exit(code=1)
+
+    # Check 1: Import paths & device
+    try:
+        config.validate_for_execution()
+        add_check("Import paths & device", "PASS")
+    except Exception as e:
+        add_check("Import paths & device", "FAIL", str(e))
+        _render_preflight_results(results, json_output)
+        raise typer.Exit(code=1)
+
+    # Check 2: Semantic validation
+    issues = config.validate_semantics()
+    if issues:
+        for issue in issues:
+            add_check("Semantic", "WARN", issue)
+    else:
+        add_check("Semantic validation", "PASS")
+
+    # Check 3: Object instantiation
+    try:
+        model = config.create_model()
+        optimizer = config.create_optimizer(model)
+        scheduler = config.create_scheduler(optimizer)
+        criterion = config.create_criterion()
+        add_check("Object instantiation", "PASS")
+    except Exception as e:
+        add_check("Object instantiation", "FAIL", str(e))
+        _render_preflight_results(results, json_output)
+        raise typer.Exit(code=1)
+
+    # Check 4: Data loading
+    try:
+        ds_train, ds_val = config.load_data()
+        dl_train = DataLoader(ds_train, batch_size=config.batch_size, shuffle=True)
+        add_check("Data loading", "PASS", f"train={len(ds_train)}, val={len(ds_val)}")
+    except Exception as e:
+        add_check("Data loading", "FAIL", str(e))
+        _render_preflight_results(results, json_output)
+        raise typer.Exit(code=1)
+
+    # Check 5: Forward + backward pass
+    dev = config.device
+    try:
+        model = model.to(dev)
+        if dev.startswith("cuda"):
+            torch.cuda.reset_peak_memory_stats()
+
+        x, y = next(iter(dl_train))
+        x, y = x.to(dev), y.to(dev)
+
+        model.train()
+        y_pred = model(x)
+        loss = criterion(y_pred, y)
+        add_check("Forward pass", "PASS",
+                   f"output={tuple(y_pred.shape)}, loss={loss.item():.6f}")
+
+        if y_pred.shape != y.shape:
+            add_check("Shape check", "WARN",
+                       f"model output {tuple(y_pred.shape)} vs target {tuple(y.shape)}")
+        else:
+            add_check("Shape check", "PASS")
+
+        optimizer.zero_grad()
+        loss.backward()
+
+        # Gradient check
+        total_grad_norm = 0.0
+        has_bad_grad = False
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                if not torch.isfinite(param.grad).all():
+                    has_bad_grad = True
+                total_grad_norm += param.grad.norm().item() ** 2
+        total_grad_norm = total_grad_norm ** 0.5
+
+        if has_bad_grad:
+            add_check("Gradient check", "FAIL", "NaN/Inf detected in gradients")
+        else:
+            add_check("Gradient check", "PASS", f"grad norm={total_grad_norm:.6f}")
+
+        optimizer.step()
+        add_check("Optimizer step", "PASS")
+
+    except Exception as e:
+        add_check("Forward/backward pass", "FAIL", str(e))
+
+    # Check 6: Scheduler step
+    try:
+        scheduler.step()
+        add_check("Scheduler step", "PASS")
+    except Exception as e:
+        add_check("Scheduler step", "FAIL", str(e))
+
+    # GPU memory
+    if dev.startswith("cuda"):
+        peak_mem = torch.cuda.max_memory_allocated() / 1024**2
+        results["gpu_memory_mb"] = round(peak_mem, 2)
+        add_check("GPU memory", "PASS", f"peak={peak_mem:.1f} MB (1 batch)")
+
+    _render_preflight_results(results, json_output)
+    if not results["passed"]:
         raise typer.Exit(code=1)
 
 
@@ -201,6 +413,135 @@ def doctor():
     console.print(table)
 
 
+@app.command(name="hpo-report")
+def hpo_report(
+    db: str = typer.Option(None, help="Path to Optuna SQLite database"),
+    study_name: str = typer.Option(None, help="Study name within the database"),
+    opt_config: str = typer.Option(None, help="Path to optimization YAML (for boundary check)"),
+    top_k: int = typer.Option(5, help="Number of top trials to show"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Analyze HPO results: best trial, parameter importance, boundary warnings."""
+    try:
+        import glob as glob_mod
+        import optuna
+        from config import OptimizeConfig
+
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+        # Auto-detect DB
+        if db is None:
+            db_files = glob_mod.glob("*.db")
+            if len(db_files) == 1:
+                db = db_files[0]
+            elif not db_files:
+                console.print("[red]No .db files found. Use --db to specify.[/red]")
+                raise typer.Exit(code=1)
+            else:
+                console.print(f"[yellow]Multiple .db files: {db_files}. Use --db.[/yellow]")
+                raise typer.Exit(code=1)
+
+        storage = f"sqlite:///{db}"
+
+        # Auto-detect study
+        if study_name is None:
+            summaries = optuna.study.get_all_study_summaries(storage)
+            if len(summaries) == 1:
+                study_name = summaries[0].study_name
+            elif not summaries:
+                console.print("[red]No studies found in database.[/red]")
+                raise typer.Exit(code=1)
+            else:
+                names = [s.study_name for s in summaries]
+                console.print(f"[yellow]Multiple studies: {names}. Use --study-name.[/yellow]")
+                raise typer.Exit(code=1)
+
+        study = optuna.load_study(study_name=study_name, storage=storage)
+
+        # Stats
+        trials = study.trials
+        completed = [t for t in trials if t.state == optuna.trial.TrialState.COMPLETE]
+        pruned = [t for t in trials if t.state == optuna.trial.TrialState.PRUNED]
+        failed = [t for t in trials if t.state == optuna.trial.TrialState.FAIL]
+
+        if not completed:
+            console.print("[red]No completed trials found.[/red]")
+            raise typer.Exit(code=1)
+
+        best = study.best_trial
+
+        # Parameter importance
+        importances: dict = {}
+        if len(completed) >= 2:
+            try:
+                importances = optuna.importance.get_param_importances(study)
+            except Exception:
+                pass
+
+        # Boundary check
+        boundary_warnings: list[str] = []
+        if opt_config:
+            opt = OptimizeConfig.from_yaml(opt_config)
+            for category, params in opt.search_space.items():
+                for param_name, param_cfg in params.items():
+                    full_key = f"{category}_{param_name}"
+                    if full_key in best.params:
+                        best_val = best.params[full_key]
+                        if param_cfg["type"] in ("int", "float"):
+                            low, high = param_cfg["min"], param_cfg["max"]
+                            range_size = high - low
+                            if range_size > 0:
+                                margin = range_size * 0.05
+                                if best_val <= low + margin:
+                                    boundary_warnings.append(
+                                        f"{full_key}={best_val} at LOWER boundary "
+                                        f"[{low}, {high}]"
+                                    )
+                                elif best_val >= high - margin:
+                                    boundary_warnings.append(
+                                        f"{full_key}={best_val} at UPPER boundary "
+                                        f"[{low}, {high}]"
+                                    )
+
+        # Top-K
+        sorted_trials = sorted(completed, key=lambda t: t.value)
+        top_trials = sorted_trials[:top_k]
+
+        report = {
+            "study_name": study_name,
+            "db": db,
+            "stats": {
+                "total": len(trials),
+                "completed": len(completed),
+                "pruned": len(pruned),
+                "failed": len(failed),
+            },
+            "best_trial": {
+                "number": best.number,
+                "value": best.value,
+                "params": best.params,
+                "group_name": best.user_attrs.get("group_name", "N/A"),
+            },
+            "importances": importances,
+            "boundary_warnings": boundary_warnings,
+            "top_k": [
+                {"number": t.number, "value": t.value, "params": t.params}
+                for t in top_trials
+            ],
+        }
+
+        if json_output:
+            console.print(json_lib.dumps(report, indent=2, default=str))
+        else:
+            _render_hpo_report(report)
+
+    except typer.Exit:
+        raise
+    except Exception:
+        console.print_exception()
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def analyze(
     project: str = typer.Option(None, help="Project name (non-interactive)"),
@@ -219,7 +560,6 @@ def analyze(
             select_group,
             select_seed,
             load_model,
-            load_data,
         )
 
         if project is None:
@@ -240,7 +580,7 @@ def analyze(
         model = model.to(device)
         model.eval()
 
-        _, ds_val = load_data()
+        _, ds_val = config.load_data()
         dl_val = DataLoader(ds_val, batch_size=config.batch_size, shuffle=False)
 
         total_loss = 0.0

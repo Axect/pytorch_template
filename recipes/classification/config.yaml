@@ -5,6 +5,7 @@ optimizer: torch.optim.AdamW
 scheduler: torch.optim.lr_scheduler.CosineAnnealingLR
 criterion: torch.nn.CrossEntropyLoss
 criterion_config: {}
+data: recipes.classification.data.load_data
 epochs: 10
 batch_size: 128
 seeds: [42]

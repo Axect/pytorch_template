@@ -2,7 +2,6 @@ import torch
 from torch.utils.data import TensorDataset, random_split
 import numpy as np
 import beaupy
-from rich.console import Console
 import wandb
 import optuna
 from tqdm import tqdm
@@ -12,6 +11,7 @@ from callbacks import (
     CallbackRunner, OptimizerModeCallback, EarlyStoppingCallback,
     WandbLoggingCallback, PrunerCallback, LossPredictionCallback,
     NaNDetectionCallback, CheckpointCallback,
+    GradientMonitorCallback, OverfitDetectionCallback,
 )
 from checkpoint import CheckpointManager, SeedManifest
 from provenance import save_provenance, compute_config_hash
@@ -111,6 +111,8 @@ class Trainer:
         self.callbacks = callbacks if callbacks is not None else CallbackRunner()
         self._total_epochs = 0
         self._loss_prediction = None
+        self._max_grad_norm: float | None = None
+        self._overfit_gap_ratio: float | None = None
 
     def step(self, x):
         return self.model(x)
@@ -240,7 +242,9 @@ def run(
             callbacks_list = [
                 OptimizerModeCallback(),
                 NaNDetectionCallback(),
+                GradientMonitorCallback(),
                 LossPredictionCallback(run_config.epochs),
+                OverfitDetectionCallback(),
                 WandbLoggingCallback(),
             ]
             if run_config.early_stopping_config and run_config.early_stopping_config.enabled:

@@ -8,177 +8,266 @@
 [![Optuna](https://img.shields.io/badge/Optuna-integrated-blue.svg)](https://optuna.org/)
 [![W&B](https://img.shields.io/badge/Weights_%26_Biases-supported-FFBE00.svg)](https://wandb.ai/)
 
-PyTorch 기반 딥러닝 연구를 위한 모듈형 확장 가능 템플릿입니다. 모델, 옵티마이저, 스케줄러, 손실 함수, 콜백 등 실험의 모든 요소를 하나의 YAML 파일에 정의하고 단일 명령어로 실행할 수 있습니다.
+**YAML 하나. 명령어 하나. 완전한 연구 파이프라인.**
 
-## 주요 기능
+단순한 PyTorch 보일러플레이트가 아닙니다. 설정부터 preflight 검사, HPO, 진단, 분석까지 아우르는 완전한 실험 파이프라인입니다 — CLI와 AI 에이전트 skill이 함께 작동합니다. AI에게 "딥러닝 코드 짜줘"라고 요청하는 대신, 첫 번째 설정부터 최종 다중 시드 학습까지 모든 단계를 지원하는 검증된 scaffold를 바로 활용하세요.
 
-- **YAML 기반 설정** — 모든 실험 설정을 YAML로 관리합니다. 불변(frozen) 및 검증된 설정으로 잘못된 구성을 방지합니다.
-- **콜백 기반 학습** — 우선순위 기반 콜백을 통한 확장 가능한 학습 루프를 제공합니다. 핵심 코드를 수정하지 않고 로깅, 체크포인트, 조기 종료 등의 동작을 추가할 수 있습니다.
-- **설정 가능한 손실 함수 및 지표** — YAML을 통해 손실 함수를 교체할 수 있습니다 (`torch.nn.CrossEntropyLoss`, 사용자 정의 손실 함수 등). 내장 지표 레지스트리(MSE, MAE, R2)를 제공하며, importlib을 통한 확장이 가능합니다.
-- **체크포인트 및 재개** — 모델, 옵티마이저, 스케줄러, RNG 상태의 완전한 상태 체크포인트를 지원하며, `SeedManifest`를 통한 다중 시드 재개가 가능합니다.
-- **실행 출처 추적** — 실행마다 Python/PyTorch/CUDA 버전, GPU 정보, git 커밋, 환경 변수를 자동으로 기록합니다.
-- **하이퍼파라미터 최적화** — 사용자 정의 PFL 프루너와 심층 병합 설정 오버라이드를 갖춘 Optuna 통합을 제공합니다.
-- **실험 추적** — 콜백을 통한 Weights & Biases 로깅을 원활하게 지원합니다.
-- **CLI** — `typer` 기반 CLI로 `train`, `validate`, `preview`, `doctor`, `analyze` 하위 명령어를 제공합니다.
-- **재현성** — Python, NumPy, PyTorch 전반에 걸친 결정론적 시드 관리를 지원합니다.
+```bash
+# 1. GPU 시간을 낭비하기 전에 먼저 검증
+python -m cli preflight configs/my_run.yaml --device cuda:0
 
-## 콜백 아키텍처
+# 2. 학습 (또는 HPO 실행)
+python -m cli train configs/my_run.yaml --device cuda:0
+python -m cli train configs/my_run.yaml --optimize-config configs/my_opt.yaml --device cuda:0
 
-학습 루프는 정의된 훅 지점에서 이벤트를 발생시킵니다. 각 관심사(로깅, 조기 종료, 체크포인트)는 독립적이며 우선순위가 정해진 콜백입니다:
+# 3. HPO 결과 분석
+python -m cli hpo-report --opt-config configs/my_opt.yaml
 
-![Callback Execution Flow](assets/callback_flow.png)
+# 4. 최적 모델 분석
+python -m cli analyze --project MyProject --group <group> --seed <seed>
+```
 
-| 콜백 | 우선순위 | 훅 | 목적 |
-|------|---------|-----|------|
-| `NaNDetectionCallback` | 5 | `on_epoch_end` | NaN 손실 감지 및 중단 신호 |
-| `OptimizerModeCallback` | 10 | `on_train_epoch_begin`, `on_val_begin` | SPlus/ScheduleFree 학습/평가 모드 전환 |
-| `LossPredictionCallback` | 70 | `on_val_end` | 조기 프루닝을 위한 최종 손실 예측 |
-| `WandbLoggingCallback` | 80 | `on_epoch_end` | W&B에 지표 로깅 |
-| `PrunerCallback` | 85 | `on_val_end` | Optuna 프루너에 보고 |
-| `EarlyStoppingCallback` | 90 | `on_val_end` | 지표 모니터링 및 중단 신호 |
-| `CheckpointCallback` | 95 | `on_epoch_end` | 주기적/최적 체크포인트 저장 |
+---
 
-사용자 정의 동작을 추가하려면 `TrainingCallback`을 상속하고 콜백 리스트에 추가하기만 하면 됩니다. 학습 루프를 전혀 수정할 필요가 없습니다.
+## 왜 이 템플릿인가?
+
+| 문제 | 해결책 |
+|------|--------|
+| 수 시간의 GPU 학습 후에야 설정 오류를 발견 | `preflight`가 수 초 만에 배치 1개의 순전파+역전파를 실행 — 학습 시작 전에 shape 불일치, 잘못된 import, NaN 그래디언트, GPU OOM을 모두 잡아냄 |
+| 스크립트 전반에 흩어진 실험 설정 | 실험당 단일 frozen YAML — 실행 전 완전히 검증됨 |
+| 프로젝트마다 학습 루프를 새로 작성 | 콜백 기반 루프 — 루프 자체를 수정하지 않고 확장 가능 |
+| "내 머신에서는 됐는데..." | 실행마다 Python/PyTorch/CUDA/GPU/git 해시 전체 출처 기록 |
+| 수동 하이퍼파라미터 튜닝 | Optuna + PFL 프루너로 가망 없는 트라이얼 조기 가지치기 |
+| HPO가 끝나도 결과가 블랙박스 | `hpo-report`로 파라미터 중요도(fANOVA), 경계 경고, 상위-K 트라이얼 비교 확인 |
+| 묵시적 과적합 또는 그래디언트 폭발 | `GradientMonitorCallback`과 `OverfitDetectionCallback`이 자동 감지 후 W&B에 로깅 |
+| 지난달 결과를 재현할 수 없음 | 결정론적 다중 시드 학습 + 체크포인트 재개 |
+
+---
+
+## 전체 파이프라인
+
+```
+configs/my_run.yaml          ← 모든 것을 YAML 하나에 정의
+        │
+        ▼
+python -m cli preflight      ← 수 시간이 아닌 수 초 만에 오류 포착
+        │
+        ▼
+python -m cli train \        ← Optuna + PFL 프루너로 HPO 실행
+  --optimize-config ...
+        │
+        ▼
+python -m cli hpo-report     ← 파라미터 중요도, 경계 경고, 상위-K 트라이얼
+        │
+        ▼
+python -m cli train \        ← 최적 파라미터로 최종 다중 시드 학습
+  configs/my_best.yaml
+        │
+        ▼
+python -m cli analyze        ← 결과 검증 및 플롯 생성
+```
+
+**Phase 1 — 설정 생성.** YAML 하나에 모델, 옵티마이저, 스케줄러, criterion, 시드, 그리고 importlib을 통해 임의의 `load_data()` 함수를 가리키는 `data` 필드를 정의합니다. 코드 수정 없이 데이터셋 교체 가능.
+
+**Phase 2 — Pre-flight 검사.** 전체 실행을 시작하기 전에, `preflight`가 배치 1개의 순전파+역전파 전체를 실행하고 모든 컴포넌트에 대해 pass/warn/fail을 보고합니다.
+
+**Phase 3 — 진단 포함 학습.** 콜백 시스템이 학습 전반에 걸쳐 그래디언트 norm과 train/val 발산을 자동으로 모니터링하고, 모든 내용을 W&B에 로깅합니다.
+
+**Phase 4 — Optuna + PFL 프루너를 활용한 HPO.** 커스텀 PFL (Predicted Final Loss) 프루너가 초기 손실 이력에 지수 감소 곡선을 피팅해, GPU 시간을 낭비하기 전에 트라이얼을 조기 가지치기합니다.
+
+**Phase 5 — HPO 분석.** `hpo-report`가 Optuna SQLite 데이터베이스를 읽어 fANOVA 기반 파라미터 중요도, 경계 경고(탐색 공간 끝에 최적값이 있다면 범위를 넓혀야 한다는 신호), 상위-K 트라이얼 순위 표를 생성합니다.
+
+**Phase 6 — 최종 학습.** 최적 HPO 파라미터를 `best.yaml`로 저장하고, 다중 시드로 확장해 완전히 학습합니다.
+
+**Phase 7 — 분석.** `analyze`가 체크포인트를 인터랙티브하게 불러와 검증 세트에서 평가합니다.
+
+---
+
+## AI 보조 학습 (Claude Code Skill)
+
+이 템플릿에는 전체 실험 생애주기를 안내하는 내장 [Claude Code](https://claude.ai/claude-code) skill이 포함되어 있습니다:
+
+```
+User: "DeepONet 모델 버전 0.10에 HPO 설정해줘"
+
+Agent: configs/OSPREY_v0.10/deeponet_run.yaml 생성
+       configs/OSPREY_v0.10/deeponet_opt.yaml 생성
+       preflight를 실행해 설정 오류 확인
+       최적 SPlus + ExpHyperbolicLR 기본값으로 HPO 실행
+       hpo-report를 실행해 결과 분석
+       최적 파라미터 추출 → deeponet_best.yaml
+       최종 다중 시드 학습 시작
+```
+
+이 skill에는 도메인 지식이 내장되어 있습니다: SPlus의 올바른 lr 범위(일반적인 1e-5~1e-2가 아닌 1e-3~1e+0), hyperbolic 스케줄러에서 `total_steps`를 HPO `epochs`와 동기화해서는 안 되는 이유, 그리고 경계 경고를 해석하는 방법. 일일이 외우지 않아도 연구 수준의 기본값을 바로 활용할 수 있습니다.
+
+> 자세한 내용은 [`.claude/skills/pytorch-train/`](.claude/skills/pytorch-train/)을 참조하십시오. 기존 사용자는 `/pytorch-migrate`를 실행하여 프로젝트를 최신 버전으로 업데이트할 수 있습니다.
+
+---
 
 ## 빠른 시작
 
-1.  **클론:**
-    ```bash
-    git clone https://github.com/<your-username>/<your-repo>.git
-    cd <your-repo>
-    ```
+```bash
+git clone https://github.com/Axect/pytorch_template.git && cd pytorch_template
 
-2.  **의존성 설치** ([uv](https://github.com/astral-sh/uv) 권장):
-    ```bash
-    uv venv && source .venv/bin/activate
-    uv pip install -U torch wandb rich beaupy numpy optuna matplotlib scienceplots typer tqdm pyyaml pytorch-optimizer pytorch-scheduler
-    ```
+# 설치 (uv 권장)
+uv venv && source .venv/bin/activate
+uv pip install -U torch wandb rich beaupy numpy optuna matplotlib \
+  scienceplots typer tqdm pyyaml pytorch-optimizer pytorch-scheduler
 
-3.  **환경 검증:**
-    ```bash
-    python -m cli doctor
-    ```
+# 환경 확인
+python -m cli doctor
 
-4.  **설정 미리보기** (학습 없이 설정만 확인):
-    ```bash
-    python -m cli preview configs/run_template.yaml
-    ```
+# 학습 전 설정 검증
+python -m cli preflight configs/run_template.yaml
 
-5.  **학습:**
-    ```bash
-    python -m cli train configs/run_template.yaml
-    # 또는 디바이스 지정:
-    python -m cli train configs/run_template.yaml --device cpu
-    ```
+# 모델 아키텍처 미리보기 (학습 없이)
+python -m cli preview configs/run_template.yaml
 
-6.  **하이퍼파라미터 최적화:**
-    ```bash
-    python -m cli train configs/run_template.yaml --optimize-config configs/optimize_template.yaml
-    ```
+# 학습
+python -m cli train configs/run_template.yaml --device cuda:0
 
-7.  **결과 분석:**
-    ```bash
-    python -m cli analyze
-    # 또는 비대화형 모드:
-    python -m cli analyze --project MyProject --group MyGroup --seed 42
-    ```
-
-> **레거시 CLI**: `python main.py --run_config configs/run_template.yaml` 명령어도 하위 호환성을 위해 계속 사용 가능합니다.
-
-## 프로젝트 구조
-
-```
-pytorch_template/
-├── cli.py                 # Typer CLI 진입점 (train, validate, preview, doctor, analyze)
-├── main.py                # 레거시 argparse 진입점
-├── config.py              # RunConfig (불변, 검증됨) + OptimizeConfig
-├── util.py                # Trainer, run(), 데이터 로딩, 분석 헬퍼
-├── callbacks.py           # 콜백 시스템 (8개 내장 콜백 + CallbackRunner)
-├── metrics.py             # 지표 레지스트리 (MSE, MAE, R2 + importlib 확장)
-├── checkpoint.py          # CheckpointManager + SeedManifest
-├── provenance.py          # 환경 캡처 + 설정 해싱
-├── model.py               # 모델 아키텍처 (MLP)
-├── pruner.py              # Optuna용 PFL 프루너
-├── configs/
-│   ├── run_template.yaml
-│   └── optimize_template.yaml
-├── recipes/
-│   ├── regression/        # 사인파 회귀 (MLP + MSELoss)
-│   └── classification/    # FashionMNIST 분류 (CNN + CrossEntropyLoss)
-├── tests/                 # 36개 단위 테스트
-└── runs/                  # 실험 출력 (자동 생성)
+# 결과 분석
+python -m cli analyze
 ```
 
-## 설정
+---
 
-### 실행 설정 (`run_template.yaml`)
+## 동작 원리
+
+### 모든 것은 YAML로
 
 ```yaml
-project: PyTorch_Template
+project: MyProject
 device: cuda:0
-net: model.MLP
+net: model.MLP                                         # importlib으로 해석 가능한 임의의 경로
 optimizer: pytorch_optimizer.SPlus
 scheduler: pytorch_scheduler.ExpHyperbolicLRScheduler
-criterion: torch.nn.MSELoss          # importlib을 통한 임의의 손실 함수
-criterion_config: {}                  # criterion 생성자에 전달할 인자
-epochs: 50
+criterion: torch.nn.MSELoss
+criterion_config: {}
+data: recipes.regression.data.load_data                # 임의의 load_data() 함수를 가리킴
+seeds: [89, 231, 928, 814, 269]                        # 다중 시드 재현성
+epochs: 150
 batch_size: 256
-seeds: [89, 231, 928, 814, 269]
 net_config:
   nodes: 64
   layers: 4
 optimizer_config:
-  lr: 1.e-3
+  lr: 1.e-1
   eps: 1.e-10
 scheduler_config:
-  total_steps: 50
-  upper_bound: 250
-  min_lr: 1.e-5
-early_stopping_config:
-  enabled: false
-  patience: 10
-  mode: min
-  min_delta: 0.0001
-checkpoint_config:
-  enabled: false
-  save_every_n_epochs: 10
-  keep_last_k: 3
-  save_best: true
-  monitor: val_loss
-  mode: min
+  total_steps: 150
+  upper_bound: 300
+  min_lr: 1.e-6
 ```
 
-**주요 필드:**
+`data` 필드는 importlib을 통해 임의의 `load_data()` 함수를 가리킵니다. 한 줄만 바꾸면 데이터셋 교체 — `cli.py`나 `util.py` 수정 불필요.
 
-| 필드 | 설명 |
-|------|------|
-| `net` | `module.Class` 형식의 모델 클래스 경로 |
-| `optimizer` | 옵티마이저 클래스 경로 (`torch.optim.*`, `pytorch_optimizer.*`, 사용자 정의 지원) |
-| `scheduler` | 스케줄러 클래스 경로 (`torch.optim.lr_scheduler.*`, `pytorch_scheduler.*`, 사용자 정의 지원) |
-| `criterion` | 손실 함수 클래스 경로 (예: `torch.nn.MSELoss`, `torch.nn.CrossEntropyLoss`) |
-| `criterion_config` | criterion 생성자에 전달할 인자 |
-| `seeds` | 랜덤 시드 목록 — 각 시드는 별도의 학습 실행에 해당 |
-| `checkpoint_config` | 설정 가능한 정책을 갖춘 주기적/최적 체크포인트 저장 |
+모든 모듈 경로(모델, 옵티마이저, 스케줄러, criterion, 데이터)는 런타임에 해석됩니다. GPU 사이클이 단 한 번도 소모되기 전에 세 단계의 검증이 실행됩니다:
 
-모든 모듈 경로는 런타임에 `importlib`을 통해 해석됩니다. 설정은 생성 후 **불변(frozen)** 상태가 됩니다. 수정된 복사본을 생성하려면 `config.with_overrides(field=value)`를 사용하십시오.
+1. **구조적 검증** — 형식 검사, 비어 있지 않은 seeds, 양수인 epochs/batch_size, module.Class 형식
+2. **런타임 검증** — CUDA 가용성, 모든 import 경로의 실제 해석 가능 여부
+3. **의미론적 검증** — hyperbolic 스케줄러에서 `upper_bound >= total_steps`, lr 양수 여부, 시드 고유성, 조기 종료 patience와 epochs의 관계
 
-### 최적화 설정
+### 콜백 아키텍처
 
-전체 템플릿은 [`configs/optimize_template.yaml`](configs/optimize_template.yaml)을 참조하십시오. 주요 섹션: `search_space`, `sampler`, `pruner`.
+학습 루프는 이벤트를 발생시키고, 각 동작은 독립적이고 우선순위가 정해진 콜백으로 처리됩니다:
 
-## 커스터마이징
+![Callback Execution Flow](assets/callback_flow.png)
 
-### 사용자 정의 모델 추가
+| 콜백 | 우선순위 | 목적 |
+|------|---------|------|
+| `NaNDetectionCallback` | 5 | NaN 손실 감지 및 중단 신호 |
+| `OptimizerModeCallback` | 10 | SPlus/ScheduleFree 학습/평가 모드 전환 |
+| `GradientMonitorCallback` | 12 | 그래디언트 폭발 감지, grad norm을 W&B에 로깅 |
+| `LossPredictionCallback` | 70 | PFL 프루너를 위한 최종 손실 예측 |
+| `OverfitDetectionCallback` | 75 | train/val 발산 감지, gap ratio를 W&B에 로깅 |
+| `WandbLoggingCallback` | 80 | 모든 지표를 Weights & Biases에 로깅 |
+| `PrunerCallback` | 85 | Optuna 프루너에 보고, TrialPruned 발생 |
+| `EarlyStoppingCallback` | 90 | patience 기반 조기 종료 |
+| `CheckpointCallback` | 95 | 주기적/최적 모델 체크포인트 저장 |
 
-`model.py` 또는 새 파일에 모델 클래스를 생성합니다. 생성자는 `(hparams: dict, device: str)`를 인자로 받아야 합니다:
+`TrainingCallback`을 상속하는 것만으로 사용자 정의 동작을 추가할 수 있습니다 — 학습 루프는 전혀 수정 불필요:
+
+```python
+class GradientClipCallback(TrainingCallback):
+    priority = 15  # GradientMonitorCallback 바로 다음에 실행
+
+    def on_train_step_end(self, trainer, **kwargs):
+        torch.nn.utils.clip_grad_norm_(trainer.model.parameters(), 1.0)
+```
+
+### Pre-flight 검사
+
+모든 학습 실행 또는 HPO 작업 전에 실행하세요. 수 시간 후가 아닌 수 초 만에 문제를 잡아냅니다:
+
+```
+                         Pre-flight Check
+┌─────────────────────────┬────────┬──────────────────────────────────────────┐
+│ Check                   │ Status │ Detail                                   │
+├─────────────────────────┼────────┼──────────────────────────────────────────┤
+│ Import paths & device   │  PASS  │                                          │
+│ Semantic validation     │  PASS  │                                          │
+│ Object instantiation    │  PASS  │                                          │
+│ Data loading            │  PASS  │ train=8000, val=2000                     │
+│ Forward pass            │  PASS  │ output=(256, 1), loss=0.512341           │
+│ Shape check             │  PASS  │                                          │
+│ Gradient check          │  PASS  │ grad norm=0.034821                       │
+│ Optimizer step          │  PASS  │                                          │
+│ Scheduler step          │  PASS  │                                          │
+│ GPU memory              │  PASS  │ peak=42.3 MB (1 batch)                   │
+└─────────────────────────┴────────┴──────────────────────────────────────────┘
+All pre-flight checks passed.
+```
+
+머신이 읽을 수 있는 출력이 필요하다면 `--json`을 사용하세요 (Claude Code skill이 자동 파싱에 활용):
+
+```bash
+python -m cli preflight configs/my_run.yaml --device cuda:0 --json
+```
+
+### HPO 분석
+
+HPO 완료 후 `hpo-report`를 실행해 Optuna가 찾은 결과를 이해하세요 — 최적 파라미터가 무엇인지뿐 아니라, 탐색 공간이 충분히 넓었는지도 확인할 수 있습니다:
+
+```
+Study: my_study (MyProject_Opt.db)
+Trials: 50 total, 38 completed, 11 pruned, 1 failed
+
+Best Trial #23
+  Value: 0.003241
+  Group: MLP_n_64_l_4_SP_lr_2.3e-01_EHLS_t_150_u_300_m_1e-06
+  optimizer_config_lr: 0.231
+  net_config_layers: 4
+
+         Parameter Importance
+┌─────────────────────────┬──────────────────────────────────────┐
+│ Parameter               │ Importance                           │
+├─────────────────────────┼──────────────────────────────────────┤
+│ optimizer_config_lr     │ 0.8741 ██████████████████████████    │
+│ net_config_layers       │ 0.1259 ████                          │
+└─────────────────────────┴──────────────────────────────────────┘
+
+Boundary Warnings:
+  optimizer_config_lr=0.231 at UPPER boundary [1e-3, 1e+0]
+```
+
+경계 경고는 옵티마이저가 더 넓은 탐색 범위에서 이득을 볼 수 있다는 의미입니다. Skill이 이를 자동으로 감지해 재실행 전에 범위를 넓히도록 안내합니다.
+
+---
+
+## 확장하기
+
+<details>
+<summary><strong>사용자 정의 모델</strong></summary>
 
 ```python
 # my_model.py
 class MyTransformer(nn.Module):
-    def __init__(self, hparams, device="cpu"):
+    def __init__(self, hparams: dict, device: str = "cpu"):
         super().__init__()
-        # hparams는 YAML의 net_config에서 전달됩니다
-        ...
+        # hparams는 YAML의 net_config에서 직접 전달됨
+        self.d_model = hparams["d_model"]
 ```
 
 ```yaml
@@ -188,144 +277,107 @@ net_config:
   nhead: 8
 ```
 
-### 사용자 정의 콜백 추가
+</details>
 
-`TrainingCallback`을 상속하고 훅 메서드를 오버라이드합니다:
-
-```python
-# my_callbacks.py
-from callbacks import TrainingCallback
-
-class GradientClipCallback(TrainingCallback):
-    priority = 15  # OptimizerMode 이후 초기에 실행
-
-    def __init__(self, max_norm=1.0):
-        self.max_norm = max_norm
-
-    def on_train_step_end(self, trainer, batch_idx, loss, **kwargs):
-        torch.nn.utils.clip_grad_norm_(trainer.model.parameters(), self.max_norm)
-```
-
-그런 다음 학습 스크립트의 콜백 리스트에 추가하거나 `run()`을 확장합니다.
-
-### 사용자 정의 지표 추가
-
-내장 이름 또는 importlib 경로를 등록합니다:
-
-```python
-from metrics import MetricRegistry
-
-registry = MetricRegistry(["mse", "mae", "r2", "my_module.MyCustomMetric"])
-results = registry.compute(y_pred, y_true)
-# {"mse": 0.012, "mae": 0.089, "r2": 0.95, "my_custom_metric": ...}
-```
-
-### 손실 함수 교체
-
-YAML에서 한 줄만 변경하면 됩니다. 코드 수정은 필요하지 않습니다:
+<details>
+<summary><strong>사용자 정의 손실 함수</strong></summary>
 
 ```yaml
-# 회귀
-criterion: torch.nn.MSELoss
-
-# 분류
-criterion: torch.nn.CrossEntropyLoss
-
-# 사용자 정의
 criterion: my_losses.FocalLoss
 criterion_config:
   gamma: 2.0
   alpha: 0.25
 ```
 
-### 다른 스케줄러 사용
+</details>
+
+<details>
+<summary><strong>사용자 정의 지표</strong></summary>
+
+```python
+from metrics import MetricRegistry
+registry = MetricRegistry(["mse", "mae", "r2", "my_module.MyMetric"])
+results = registry.compute(y_pred, y_true)
+```
+
+</details>
+
+<details>
+<summary><strong>사용자 정의 데이터</strong></summary>
+
+`(train_dataset, val_dataset)`을 반환하는 `load_data()` 함수가 있는 모듈을 생성하고, 설정에서 해당 경로를 지정하세요:
+
+```python
+# recipes/myproject/data.py
+def load_data():
+    # 데이터셋 구성
+    return train_dataset, val_dataset
+```
 
 ```yaml
-# PyTorch 내장
-scheduler: torch.optim.lr_scheduler.CosineAnnealingLR
-scheduler_config:
-  T_max: 50
-  eta_min: 1.e-5
-
-# ExpHyperbolicLR (pytorch-scheduler 패키지)
-scheduler: pytorch_scheduler.ExpHyperbolicLRScheduler
-scheduler_config:
-  total_steps: 50
-  upper_bound: 250
-  min_lr: 1.e-5
+data: recipes.myproject.data.load_data
 ```
 
-### 데이터 로딩 커스터마이징
+`cli.py`나 `util.py` 수정 불필요. 완전한 예시는 [`recipes/regression/`](recipes/regression/) 및 [`recipes/classification/`](recipes/classification/)을 참조하십시오.
 
-`util.py`의 `load_data()`를 수정하여 `(train_dataset, val_dataset)`를 반환하도록 합니다. 예시(회귀 + 분류)는 [`recipes/`](recipes/)를 참조하십시오.
+</details>
 
-## 예제 레시피
+---
 
-| 레시피 | 과제 | 모델 | 손실 함수 | 설정 |
-|--------|------|------|----------|------|
-| [`recipes/regression/`](recipes/regression/) | 사인파 피팅 | MLP (64 노드, 4 레이어) | MSELoss | [config.yaml](recipes/regression/config.yaml) |
-| [`recipes/classification/`](recipes/classification/) | FashionMNIST | SimpleCNN (32 채널) | CrossEntropyLoss | [config.yaml](recipes/classification/config.yaml) |
+## 프로젝트 구조
 
-```bash
-python -m cli train recipes/regression/config.yaml --device cpu
 ```
+pytorch_template/
+├── cli.py              # CLI: train, preflight, validate, preview, doctor, analyze, hpo-report
+├── config.py           # RunConfig (frozen, 3단계 검증) + OptimizeConfig
+├── util.py             # Trainer, run(), 데이터 로딩
+├── callbacks.py        # 9개 내장 콜백 + CallbackRunner
+├── checkpoint.py       # CheckpointManager + SeedManifest
+├── provenance.py       # 환경 캡처 + 설정 해싱
+├── pruner.py           # Optuna용 PFL 프루너
+├── metrics.py          # 지표 레지스트리 (MSE, MAE, R2)
+├── model.py            # 내장 MLP
+├── configs/            # YAML 설정 템플릿
+├── recipes/            # 예제 레시피 (회귀, 분류)
+├── tests/              # 단위 테스트
+├── docs/               # 사람을 위한 Skill 가이드 (여러분이 읽는 문서)
+└── .claude/skills/     # AI Skills (pytorch-train, pytorch-migrate)
+```
+
+---
 
 ## CLI 참조
 
 | 명령어 | 설명 |
 |--------|------|
-| `python -m cli train <config> [--device] [--optimize-config]` | 선택적 HPO를 포함한 모델 학습 |
-| `python -m cli validate <config>` | 학습 없이 설정 검증 |
-| `python -m cli preview <config>` | 모델 아키텍처 및 설정 요약 표시 |
-| `python -m cli doctor` | Python, PyTorch, CUDA, W&B, 패키지 확인 |
-| `python -m cli analyze [--project] [--group] [--seed] [--device]` | 학습된 모델 분석 |
+| `python -m cli train <config> [--device DEV] [--optimize-config OPT]` | 학습 또는 HPO 실행 |
+| `python -m cli preflight <config> [--device DEV] [--json]` | Pre-flight 검사: 배치 1개 순전파+역전파, shape/그래디언트/메모리 |
+| `python -m cli validate <config>` | 구조적 + 런타임 설정 검증만 실행 |
+| `python -m cli preview <config>` | 모델 아키텍처 및 파라미터 수 출력, 학습 없음 |
+| `python -m cli doctor` | Python, PyTorch, CUDA, wandb, 필수 패키지 확인 |
+| `python -m cli hpo-report [--db DB] [--opt-config OPT] [--top-k K] [--json]` | HPO 결과 분석: 파라미터 중요도, 경계 경고, 상위-K |
+| `python -m cli analyze [--project P] [--group G] [--seed S] [--device DEV]` | 학습된 모델 체크포인트 평가 |
 
-## 문서
+---
 
-구성 요소 및 커스터마이징에 대한 심층 내용은 아래를 참조하십시오:
+## 문서 — 두 가지 Skill, 하나의 파이프라인
 
-* **[프로젝트 문서](https://axect.github.io/pytorch_template)** ([Tutorial-Codebase-Knowledge](https://github.com/The-Pocket/Tutorial-Codebase-Knowledge)로 생성)
+이 템플릿에는 같은 파이프라인을 가르치는 두 종류의 skill이 있습니다:
 
-## 기여
+| | AI Agent Skill | Human Skill |
+|---|---|---|
+| **위치** | `.claude/skills/pytorch-train/` | [`docs/`](https://axect.github.io/pytorch_template) |
+| **읽는 것** | 설정 규칙, 파라미터 범위, CLI 명령어 | 워크플로우 직관, 설계 결정, 트레이드오프 |
+| **배우는 것** | *무엇을* 할지 | *왜* 하는지 |
 
-기여를 환영합니다! Pull Request를 자유롭게 제출해 주십시오.
+**[Human Skill 가이드 읽기](https://axect.github.io/pytorch_template)** — 전체 파이프라인, 설정 심화, 콜백 시스템, HPO 전략, 커스터마이징까지 5개 챕터로 구성.
 
 ## 라이선스
 
-이 프로젝트는 [MIT 라이선스](LICENSE) 하에 배포됩니다.
+[MIT](LICENSE)
 
 ## 감사의 글
 
-- [pytorch-optimizer](https://github.com/kozistr/pytorch_optimizer) - SPlus를 포함한 옵티마이저 컬렉션.
-- [pytorch-scheduler](https://github.com/Axect/pytorch_scheduler) - ExpHyperbolicLR를 포함한 학습률 스케줄러 컬렉션.
-
-## 부록
-
-<details>
-<summary><strong>PFL (Predicted Final Loss) 프루너</strong></summary>
-
-### 개요
-
-PFL 프루너(`pruner.PFLPruner`)는 초기 단계의 지표를 기반으로 학습 실행의 최종 성능을 예측하여, 가능성이 낮은 Optuna 트라이얼을 조기에 가지치기합니다.
-
-### 설정
-
-```yaml
-pruner:
-  name: pruner.PFLPruner
-  kwargs:
-    n_startup_trials: 10
-    n_warmup_epochs: 10
-    top_k: 10
-    target_epoch: 50
-```
-
-### 동작 원리
-
-1. 처음 `n_startup_trials`개의 트라이얼은 기준 성능을 확립하기 위해 끝까지 실행됩니다.
-2. 이후 트라이얼에서는 `n_warmup_epochs` 이후에만 프루닝을 고려합니다.
-3. 프루너는 지수 곡선 피팅을 사용하여 현재 손실 이력으로부터 최종 손실을 예측합니다.
-4. 예측된 최종 손실이 상위 k개의 완료된 트라이얼보다 나쁜 경우, 해당 트라이얼이 프루닝됩니다.
-5. 시드 간 지표를 평균하여 다중 시드 실행을 지원합니다.
-
-</details>
+- [pytorch-optimizer](https://github.com/kozistr/pytorch_optimizer) — SPlus를 포함한 옵티마이저 컬렉션
+- [pytorch-scheduler](https://github.com/Axect/pytorch_scheduler) — ExpHyperbolicLR를 포함한 스케줄러 컬렉션
+- [Optuna](https://optuna.org/) — 하이퍼파라미터 최적화 프레임워크

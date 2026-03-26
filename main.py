@@ -1,7 +1,6 @@
 from torch.utils.data import DataLoader
-import wandb
 
-from util import load_data, run
+from util import run
 from config import RunConfig, OptimizeConfig
 
 import argparse
@@ -28,7 +27,7 @@ def main():
         base_config = base_config.with_overrides(device=args.device)
 
     # Load data
-    ds_train, ds_val = load_data()  # pyright: ignore
+    ds_train, ds_val = base_config.load_data()
     dl_train = DataLoader(ds_train, batch_size=base_config.batch_size, shuffle=True)
     dl_val = DataLoader(ds_val, batch_size=base_config.batch_size, shuffle=False)
 
