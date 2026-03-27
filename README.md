@@ -88,14 +88,14 @@ python -m cli analyze        ← validate results, generate plots
 This template ships with a built-in [Claude Code](https://claude.ai/claude-code) skill that guides you through the entire experiment lifecycle:
 
 ```
-You: "Set up HPO for my DeepONet model, version 0.10"
+You: "Set up HPO for my FluxNet model, version 0.3"
 
-Agent: Creates configs/OSPREY_v0.10/deeponet_run.yaml
-       Creates configs/OSPREY_v0.10/deeponet_opt.yaml
+Agent: Creates configs/SolarFlux_v0.3/fluxnet_run.yaml
+       Creates configs/SolarFlux_v0.3/fluxnet_opt.yaml
        Runs preflight to catch any config issues
        Launches HPO with SPlus + ExpHyperbolicLR defaults
        Runs hpo-report to analyze results
-       Extracts best params → deeponet_best.yaml
+       Extracts best params → fluxnet_best.yaml
        Launches final multi-seed training
 ```
 

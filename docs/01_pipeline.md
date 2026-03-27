@@ -17,7 +17,7 @@ Here is a complete annotated `run.yaml` for a regression task with SPlus + ExpHy
 
 ```yaml
 # ── Project Identification ──
-project: OSPREY_v0.10_DeepONet   # Convention: <NAME>_v<VERSION>_<MODEL>
+project: SolarFlux_v0.3_FluxNet   # Convention: <NAME>_v<VERSION>_<MODEL>
 device: cuda:0                    # cuda:N or cpu
 
 # ── Model ──
@@ -73,10 +73,10 @@ Change datasets by changing the `data:` field — one line. The function must re
 Config files live under `configs/<MAIN_CONTRIBUTION>_v<VERSION>/`:
 
 ```
-configs/OSPREY_v0.10/
-├── deeponet_run.yaml    # HPO base config
-├── deeponet_opt.yaml    # HPO search config
-└── deeponet_best.yaml   # Final training config (created after HPO)
+configs/SolarFlux_v0.3/
+├── fluxnet_run.yaml    # HPO base config
+├── fluxnet_opt.yaml    # HPO search config
+└── fluxnet_best.yaml   # Final training config (created after HPO)
 ```
 
 See **[Chapter 2: Configuration Deep Dive](02_config.html)** for every field explained.
@@ -88,7 +88,7 @@ See **[Chapter 2: Configuration Deep Dive](02_config.html)** for every field exp
 A single shape mismatch can waste hours of GPU time. Preflight catches it in seconds by running one batch forward and backward through the full stack — data loading, model instantiation, optimizer step, gradient check.
 
 ```bash
-python -m cli preflight configs/OSPREY_v0.10/deeponet_run.yaml --device cuda:0
+python -m cli preflight configs/SolarFlux_v0.3/fluxnet_run.yaml --device cuda:0
 ```
 
 The output is a table of checks:
@@ -114,8 +114,8 @@ Fix every FAIL and investigate every WARN before proceeding. Use `--json` for ma
 Also available before preflight:
 
 ```bash
-python -m cli validate configs/OSPREY_v0.10/deeponet_run.yaml  # Schema + semantic checks only
-python -m cli preview configs/OSPREY_v0.10/deeponet_run.yaml   # Print model architecture
+python -m cli validate configs/SolarFlux_v0.3/fluxnet_run.yaml  # Schema + semantic checks only
+python -m cli preview configs/SolarFlux_v0.3/fluxnet_run.yaml   # Print model architecture
 ```
 
 ---
@@ -123,7 +123,7 @@ python -m cli preview configs/OSPREY_v0.10/deeponet_run.yaml   # Print model arc
 ## Phase 3: Training
 
 ```bash
-python -m cli train configs/OSPREY_v0.10/deeponet_run.yaml --device cuda:0
+python -m cli train configs/SolarFlux_v0.3/fluxnet_run.yaml --device cuda:0
 ```
 
 What happens when you run this:
@@ -145,11 +145,11 @@ Two diagnostic callbacks run automatically during every training session:
 For long runs, queue with pueue so they survive session termination:
 
 ```bash
-pueue group add OSPREY
-pueue add -g OSPREY -- bash -c \
+pueue group add SolarFlux
+pueue add -g SolarFlux -- bash -c \
   "cd /path/to/project && .venv/bin/python -m cli train \
-   configs/OSPREY_v0.10/deeponet_run.yaml --device cuda:0"
-pueue status -g OSPREY
+   configs/SolarFlux_v0.3/fluxnet_run.yaml --device cuda:0"
+pueue status -g SolarFlux
 ```
 
 ---
@@ -159,7 +159,7 @@ pueue status -g OSPREY
 HPO finds the best hyperparameters by running many short training trials and using the results to guide the search. The optimizer config (`opt.yaml`) defines the search space:
 
 ```yaml
-study_name: DeepONet_TPE
+study_name: FluxNet_TPE
 trials: 50
 seed: 42
 metric: val_loss
@@ -199,8 +199,8 @@ search_space:
 Run HPO:
 
 ```bash
-python -m cli train configs/OSPREY_v0.10/deeponet_run.yaml \
-  --optimize-config configs/OSPREY_v0.10/deeponet_opt.yaml \
+python -m cli train configs/SolarFlux_v0.3/fluxnet_run.yaml \
+  --optimize-config configs/SolarFlux_v0.3/fluxnet_opt.yaml \
   --device cuda:0
 ```
 
@@ -221,12 +221,12 @@ After HPO completes, analyze the results before creating `best.yaml`:
 python -m cli hpo-report
 
 # Explicit — use when multiple studies exist
-python -m cli hpo-report --db OSPREY_v0.10_DeepONet_Opt.db --study-name DeepONet_TPE
+python -m cli hpo-report --db SolarFlux_v0.3_FluxNet_Opt.db --study-name FluxNet_TPE
 
 # With boundary warnings — recommended
 python -m cli hpo-report \
-  --db OSPREY_v0.10_DeepONet_Opt.db \
-  --opt-config configs/OSPREY_v0.10/deeponet_opt.yaml
+  --db SolarFlux_v0.3_FluxNet_Opt.db \
+  --opt-config configs/SolarFlux_v0.3/fluxnet_opt.yaml
 ```
 
 The report shows:
@@ -279,9 +279,9 @@ checkpoint_config:
 Then validate and run:
 
 ```bash
-python -m cli validate configs/OSPREY_v0.10/deeponet_best.yaml
-python -m cli preflight configs/OSPREY_v0.10/deeponet_best.yaml
-python -m cli train configs/OSPREY_v0.10/deeponet_best.yaml --device cuda:0
+python -m cli validate configs/SolarFlux_v0.3/fluxnet_best.yaml
+python -m cli preflight configs/SolarFlux_v0.3/fluxnet_best.yaml
+python -m cli train configs/SolarFlux_v0.3/fluxnet_best.yaml --device cuda:0
 ```
 
 With 5 seeds and 150 epochs, this is a long run. Use pueue.
@@ -293,7 +293,7 @@ With 5 seeds and 150 epochs, this is a long run. Use pueue.
 After training completes, check the run directories and analyze results:
 
 ```bash
-ls runs/OSPREY_v0.10_DeepONet/     # One subdirectory per group name
+ls runs/SolarFlux_v0.3_FluxNet/     # One subdirectory per group name
 python -m cli analyze               # Interactive model loading and evaluation
 ```
 
@@ -303,7 +303,7 @@ The `runs/` directory structure after training:
 
 ```
 runs/
-└── OSPREY_v0.10_DeepONet/
+└── SolarFlux_v0.3_FluxNet/
     └── MLP_n_64_l_5_SPlus_lr_3.42e-01.../
         ├── config.yaml              # Exact config used for this group
         ├── 58/

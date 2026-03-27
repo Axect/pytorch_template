@@ -88,14 +88,14 @@ python -m cli analyze        ← 결과 검증 및 플롯 생성
 이 템플릿에는 전체 실험 생애주기를 안내하는 내장 [Claude Code](https://claude.ai/claude-code) skill이 포함되어 있습니다:
 
 ```
-User: "DeepONet 모델 버전 0.10에 HPO 설정해줘"
+User: "FluxNet 모델 버전 0.3에 HPO 설정해줘"
 
-Agent: configs/OSPREY_v0.10/deeponet_run.yaml 생성
-       configs/OSPREY_v0.10/deeponet_opt.yaml 생성
+Agent: configs/SolarFlux_v0.3/fluxnet_run.yaml 생성
+       configs/SolarFlux_v0.3/fluxnet_opt.yaml 생성
        preflight를 실행해 설정 오류 확인
        최적 SPlus + ExpHyperbolicLR 기본값으로 HPO 실행
        hpo-report를 실행해 결과 분석
-       최적 파라미터 추출 → deeponet_best.yaml
+       최적 파라미터 추출 → fluxnet_best.yaml
        최종 다중 시드 학습 시작
 ```
 

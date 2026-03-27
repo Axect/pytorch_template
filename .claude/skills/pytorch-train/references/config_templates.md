@@ -8,7 +8,7 @@ Full annotated YAML templates for each config type. Copy and modify as needed.
 
 ```yaml
 # ── Project Identification ──
-project: <PROJECT>_v<VERSION>_<MODEL>    # e.g., OSPREY_v0.10_DeepONet
+project: <PROJECT>_v<VERSION>_<MODEL>    # e.g., SolarFlux_v0.3_FluxNet
 device: cuda:0                            # cuda:N or cpu
 
 # ── Model ──
@@ -62,7 +62,7 @@ checkpoint_config:
 
 ```yaml
 # ── Study ──
-study_name: <MODEL>_TPE                   # e.g., DeepONet_TPE
+study_name: <MODEL>_TPE                   # e.g., FluxNet_TPE
 trials: 50                                # 30-100 depending on search space
 seed: 42
 metric: val_loss
@@ -112,7 +112,7 @@ search_space:
 
 ```yaml
 # ── Project Identification ──
-project: <PROJECT>_v<VERSION>_<MODEL>     # Remove _Opt suffix
+project: <PROJECT>_v<VERSION>_<MODEL>     # Remove _Opt suffix (e.g., SolarFlux_v0.3_FluxNet)
 device: cuda:0
 
 # ── Model ──

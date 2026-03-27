@@ -189,20 +189,20 @@ Configs live under `configs/` and follow this convention:
 configs/<CONTRIBUTION>_v<VERSION>/<MODEL>_{run,opt,best}.yaml
 ```
 
-- `<CONTRIBUTION>` — the experiment name or project shorthand (e.g., `OSPREY`, `Neural_Hamilton`)
+- `<CONTRIBUTION>` — the experiment name or project shorthand (e.g., `SolarFlux`, `WavePredict`)
 - `<VERSION>` — integer version, incremented when the search space or architecture changes significantly
 - `<MODEL>` — the model or configuration variant being tested
 
 Examples:
 
 ```
-configs/OSPREY_v1/MLP_run.yaml       # base run config for HPO
-configs/OSPREY_v1/MLP_opt.yaml       # HPO search space
-configs/OSPREY_v1/MLP_best.yaml      # best config after HPO
+configs/SolarFlux_v1/MLP_run.yaml       # base run config for HPO
+configs/SolarFlux_v1/MLP_opt.yaml       # HPO search space
+configs/SolarFlux_v1/MLP_best.yaml      # best config after HPO
 
-configs/Neural_Hamilton_v2/HNN_run.yaml
-configs/Neural_Hamilton_v2/HNN_opt.yaml
-configs/Neural_Hamilton_v2/HNN_best.yaml
+configs/WavePredict_v2/HNN_run.yaml
+configs/WavePredict_v2/HNN_opt.yaml
+configs/WavePredict_v2/HNN_best.yaml
 ```
 
 This convention makes it immediately clear which phase of the workflow each file belongs to, and version numbers let you track search space evolution without losing old configs.

@@ -36,9 +36,9 @@ Before creating any files, confirm these with the user:
 
 | Item | Example | Notes |
 |------|---------|-------|
-| Project name | `OSPREY`, `NeuralHamilton` | Used in `project:` field and directory names |
-| Version | `v0.10`, `v1.32` | Determines config subdirectory |
-| Model name | `deeponet`, `mambonet`, `mlp` | File prefix and `net:` path |
+| Project name | `SolarFlux`, `WavePredict` | Used in `project:` field and directory names |
+| Version | `v0.3`, `v1.32` | Determines config subdirectory |
+| Model name | `fluxnet`, `wavenet`, `mlp` | File prefix and `net:` path |
 | Task type | regression / classification | Determines criterion, metric direction |
 | Model module path | `model.MLP`, `recipes.regression.model.MLP` | Importlib path for `net:` field |
 | net_config | `{nodes: 64, layers: 4}` | Architecture hyperparameters |
@@ -86,11 +86,11 @@ configs/<MAIN_CONTRIBUTION>_v<VERSION>/<MODEL_NAME>_{run,opt,best}.yaml
 ```
 
 Examples:
-- `configs/OSPREY_v0.10/deeponet_run.yaml`
-- `configs/OSPREY_v0.10/deeponet_opt.yaml`
-- `configs/OSPREY_v0.10/deeponet_best.yaml`
+- `configs/SolarFlux_v0.3/fluxnet_run.yaml`
+- `configs/SolarFlux_v0.3/fluxnet_opt.yaml`
+- `configs/SolarFlux_v0.3/fluxnet_best.yaml`
 
-The `project:` field follows: `<PROJECT>_v<VERSION>_<MODEL>` (e.g., `OSPREY_v0.10_DeepONet`).
+The `project:` field follows: `<PROJECT>_v<VERSION>_<MODEL>` (e.g., `SolarFlux_v0.3_FluxNet`).
 
 ### 2a: run.yaml (HPO Base Config)
 
