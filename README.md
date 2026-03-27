@@ -103,6 +103,18 @@ The skill encodes domain knowledge: correct lr ranges for SPlus (1e-3 to 1e+0, n
 
 > See [`.claude/skills/pytorch-train/`](.claude/skills/pytorch-train/) for details. Existing users can run `/pytorch-migrate` to update their projects to the latest version.
 
+## Documentation — Two Skills, One Pipeline
+
+This template has two kinds of skills that teach the same pipeline:
+
+| | AI Agent Skill | Human Skill |
+|---|---|---|
+| **Location** | `.claude/skills/pytorch-train/` | [`docs/`](https://axect.github.io/pytorch_template) |
+| **Reads** | Config rules, param ranges, CLI commands | Workflow intuition, design decisions, trade-offs |
+| **Learns** | *What* to do | *Why* to do it |
+
+**[Read the Human Skill Guide](https://axect.github.io/pytorch_template)** — 5 chapters covering the full pipeline, configuration deep dive, callback system, HPO strategies, and customization.
+
 ---
 
 ## Quick Start
@@ -357,20 +369,6 @@ pytorch_template/
 | `python -m cli doctor` | Check Python, PyTorch, CUDA, wandb, required packages |
 | `python -m cli hpo-report [--db DB] [--opt-config OPT] [--top-k K] [--json]` | Analyze HPO results: param importance, boundary warnings, top-K |
 | `python -m cli analyze [--project P] [--group G] [--seed S] [--device DEV]` | Evaluate a trained model checkpoint |
-
----
-
-## Documentation — Two Skills, One Pipeline
-
-This template has two kinds of skills that teach the same pipeline:
-
-| | AI Agent Skill | Human Skill |
-|---|---|---|
-| **Location** | `.claude/skills/pytorch-train/` | [`docs/`](https://axect.github.io/pytorch_template) |
-| **Reads** | Config rules, param ranges, CLI commands | Workflow intuition, design decisions, trade-offs |
-| **Learns** | *What* to do | *Why* to do it |
-
-**[Read the Human Skill Guide](https://axect.github.io/pytorch_template)** — 5 chapters covering the full pipeline, configuration deep dive, callback system, HPO strategies, and customization.
 
 ## License
 

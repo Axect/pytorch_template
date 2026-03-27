@@ -103,6 +103,18 @@ Agent: configs/SolarFlux_v0.3/fluxnet_run.yaml 생성
 
 > 자세한 내용은 [`.claude/skills/pytorch-train/`](.claude/skills/pytorch-train/)을 참조하십시오. 기존 사용자는 `/pytorch-migrate`를 실행하여 프로젝트를 최신 버전으로 업데이트할 수 있습니다.
 
+## 문서 — 두 가지 Skill, 하나의 파이프라인
+
+이 템플릿에는 같은 파이프라인을 가르치는 두 종류의 skill이 있습니다:
+
+| | AI Agent Skill | Human Skill |
+|---|---|---|
+| **위치** | `.claude/skills/pytorch-train/` | [`docs/`](https://axect.github.io/pytorch_template) |
+| **읽는 것** | 설정 규칙, 파라미터 범위, CLI 명령어 | 워크플로우 직관, 설계 결정, 트레이드오프 |
+| **배우는 것** | *무엇을* 할지 | *왜* 하는지 |
+
+**[Human Skill 가이드 읽기](https://axect.github.io/pytorch_template)** — 전체 파이프라인, 설정 심화, 콜백 시스템, HPO 전략, 커스터마이징까지 5개 챕터로 구성.
+
 ---
 
 ## 빠른 시작
@@ -357,20 +369,6 @@ pytorch_template/
 | `python -m cli doctor` | Python, PyTorch, CUDA, wandb, 필수 패키지 확인 |
 | `python -m cli hpo-report [--db DB] [--opt-config OPT] [--top-k K] [--json]` | HPO 결과 분석: 파라미터 중요도, 경계 경고, 상위-K |
 | `python -m cli analyze [--project P] [--group G] [--seed S] [--device DEV]` | 학습된 모델 체크포인트 평가 |
-
----
-
-## 문서 — 두 가지 Skill, 하나의 파이프라인
-
-이 템플릿에는 같은 파이프라인을 가르치는 두 종류의 skill이 있습니다:
-
-| | AI Agent Skill | Human Skill |
-|---|---|---|
-| **위치** | `.claude/skills/pytorch-train/` | [`docs/`](https://axect.github.io/pytorch_template) |
-| **읽는 것** | 설정 규칙, 파라미터 범위, CLI 명령어 | 워크플로우 직관, 설계 결정, 트레이드오프 |
-| **배우는 것** | *무엇을* 할지 | *왜* 하는지 |
-
-**[Human Skill 가이드 읽기](https://axect.github.io/pytorch_template)** — 전체 파이프라인, 설정 심화, 콜백 시스템, HPO 전략, 커스터마이징까지 5개 챕터로 구성.
 
 ## 라이선스
 
