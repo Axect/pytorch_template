@@ -1,3 +1,5 @@
+<div align="center">
+
 # PyTorch Template
 
 [English](README.md) | [한글](README_KR.md)
@@ -10,15 +12,16 @@
 
 **YAML 하나. 명령어 하나. 완전한 연구 파이프라인.**
 
-단순한 PyTorch 보일러플레이트가 아닙니다. 설정부터 preflight 검사, HPO, 진단, 분석까지 아우르는 완전한 실험 파이프라인입니다 — CLI와 AI 에이전트 skill이 함께 작동합니다. AI에게 "딥러닝 코드 짜줘"라고 요청하는 대신, 첫 번째 설정부터 최종 다중 시드 학습까지 모든 단계를 지원하는 검증된 scaffold를 바로 활용하세요.
+*단순한 PyTorch 보일러플레이트가 아닌 — CLI 도구와 AI 에이전트 skill을 갖춘 완전한 실험 파이프라인.*
+
+</div>
 
 ```bash
 # 1. GPU 시간을 낭비하기 전에 먼저 검증
 python -m cli preflight configs/my_run.yaml --device cuda:0
 
 # 2. 학습 (또는 HPO 실행)
-python -m cli train configs/my_run.yaml --device cuda:0
-python -m cli train configs/my_run.yaml --optimize-config configs/my_opt.yaml --device cuda:0
+python -m cli train configs/my_run.yaml --optimize-config configs/my_opt.yaml
 
 # 3. HPO 결과 분석
 python -m cli hpo-report --opt-config configs/my_opt.yaml
@@ -44,6 +47,8 @@ python -m cli analyze --project MyProject --group <group> --seed <seed>
 
 ---
 
+<div align="center">
+
 ## 전체 파이프라인
 
 ```
@@ -66,6 +71,8 @@ python -m cli train \        ← 최적 파라미터로 최종 다중 시드 학
         ▼
 python -m cli analyze        ← 결과 검증 및 플롯 생성
 ```
+
+</div>
 
 **Phase 1 — 설정 생성.** YAML 하나에 모델, 옵티마이저, 스케줄러, criterion, 시드, 그리고 importlib을 통해 임의의 `load_data()` 함수를 가리키는 `data` 필드를 정의합니다. 코드 수정 없이 데이터셋 교체 가능.
 

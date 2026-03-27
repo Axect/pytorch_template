@@ -1,3 +1,5 @@
+<div align="center">
+
 # PyTorch Template
 
 [English](README.md) | [한글](README_KR.md)
@@ -10,15 +12,16 @@
 
 **One YAML. One command. Full research pipeline.**
 
-This is not just another PyTorch boilerplate. It is a complete experiment pipeline — from config to pre-flight check to HPO to diagnostics to analysis — with both a CLI and an AI agent skill that work together. Instead of asking an AI to "write deep learning code", you get a rigorous scaffold that covers every phase from first config to final multi-seed training.
+*Not just another PyTorch boilerplate — a complete experiment pipeline with CLI tools and AI agent skills.*
+
+</div>
 
 ```bash
 # 1. Validate before you waste GPU time
 python -m cli preflight configs/my_run.yaml --device cuda:0
 
 # 2. Train (or run HPO)
-python -m cli train configs/my_run.yaml --device cuda:0
-python -m cli train configs/my_run.yaml --optimize-config configs/my_opt.yaml --device cuda:0
+python -m cli train configs/my_run.yaml --optimize-config configs/my_opt.yaml
 
 # 3. Understand what HPO found
 python -m cli hpo-report --opt-config configs/my_opt.yaml
@@ -44,6 +47,8 @@ python -m cli analyze --project MyProject --group <group> --seed <seed>
 
 ---
 
+<div align="center">
+
 ## The Full Pipeline
 
 ```
@@ -66,6 +71,8 @@ python -m cli train \        ← final multi-seed training with best params
         ▼
 python -m cli analyze        ← validate results, generate plots
 ```
+
+</div>
 
 **Phase 1 — Config creation.** One YAML defines model, optimizer, scheduler, criterion, seeds, and the `data` field that points to any `load_data()` function via importlib. No code changes to swap datasets.
 
