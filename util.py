@@ -12,6 +12,7 @@ from callbacks import (
     WandbLoggingCallback, PrunerCallback, LossPredictionCallback,
     NaNDetectionCallback, CheckpointCallback,
     GradientMonitorCallback, OverfitDetectionCallback,
+    CSVLoggingCallback, TUILoggingCallback, LatestModelCallback,
 )
 from checkpoint import CheckpointManager, SeedManifest
 from provenance import save_provenance, compute_config_hash
@@ -69,28 +70,67 @@ def set_seed(seed: int):
 
 
 def predict_final_loss(losses, max_epochs):
-    if len(losses) < 10:
-        return -np.log10(losses[-1])
-    try:
-        # Convert to numpy array
-        y = np.array(losses)
-        t = np.arange(len(y))
+    """Predict the final validation loss using shifted exponential decay.
 
-        # Fit a linear model to the log of the losses
-        y_transformed = np.log(y)
-        K, log_A = np.polyfit(t, y_transformed, 1)
-        A = np.exp(log_A)
+    Fits L(t) = a * exp(-b * t) + c to EMA-smoothed losses.
+    Returns the predicted raw loss value at max_epochs.
+    Works with positive and negative losses.
+    """
+    n = len(losses)
+    if n < 10:
+        return float(losses[-1])
 
-        # Predict final loss
-        predicted_loss = -np.log10(A * np.exp(K * max_epochs))
+    y = np.array(losses, dtype=np.float64)
 
-        if np.isfinite(predicted_loss):
-            return predicted_loss
+    # EMA smoothing — adaptive span
+    span = min(n // 3, 20)
+    alpha = 2.0 / (span + 1)
+    ema = np.empty(n)
+    ema[0] = y[0]
+    for i in range(1, n):
+        ema[i] = alpha * y[i] + (1 - alpha) * ema[i - 1]
 
-    except Exception as e:
-        print(f"Error in loss prediction: {e}")
+    # Three equally-spaced anchor points from smoothed curve
+    i1, i2, i3 = n // 3, 2 * n // 3, n - 1
+    y1, y2, y3 = ema[i1], ema[i2], ema[i3]
 
-    return -np.log10(losses[-1])
+    d12 = y1 - y2
+    d23 = y2 - y3
+
+    # Need both differences nonzero and same sign (monotonic decay or increase)
+    if abs(d12) < 1e-15 or abs(d23) < 1e-15:
+        return float(ema[-1])
+
+    r = d23 / d12
+
+    if r <= 0 or r >= 1:
+        # Non-convergent: loss increasing, oscillating, or accelerating
+        # Use damped linear extrapolation from recent trend
+        window = min(10, n - 1)
+        recent_rate = (ema[-1] - ema[-1 - window]) / window
+        remaining = max(max_epochs - n, 0)
+        predicted = ema[-1] + recent_rate * remaining * 0.5
+        return float(predicted) if np.isfinite(predicted) else float(ema[-1])
+
+    # Convergent decay: fit L(t) = a * exp(-b * t) + c
+    d = float(i2 - i1)
+    b = -np.log(r) / d
+    t1 = float(i1)
+    t2 = float(i2)
+
+    denom = np.exp(-b * t1) - np.exp(-b * t2)
+    if abs(denom) < 1e-30:
+        return float(ema[-1])
+
+    a = d12 / denom
+    c = y1 - a * np.exp(-b * t1)
+
+    predicted = a * np.exp(-b * max_epochs) + c
+
+    if np.isfinite(predicted):
+        return float(predicted)
+
+    return float(ema[-1])
 
 
 class Trainer:
@@ -215,6 +255,7 @@ def run(
 
     # Create criterion from config
     criterion = run_config.create_criterion()
+    use_wandb = run_config.logging == "wandb"
 
     try:
         for seed in seeds:
@@ -230,13 +271,15 @@ def run(
             scheduler = run_config.create_scheduler(optimizer)
 
             run_name = f"{seed}"
-            wandb.init(
-                project=project,
-                name=run_name,
-                group=group_name,
-                tags=tags,
-                config=run_config.gen_config(),
-            )
+
+            if use_wandb:
+                wandb.init(
+                    project=project,
+                    name=run_name,
+                    group=group_name,
+                    tags=tags,
+                    config=run_config.gen_config(),
+                )
 
             # Build callbacks list
             callbacks_list = [
@@ -245,8 +288,18 @@ def run(
                 GradientMonitorCallback(),
                 LossPredictionCallback(run_config.epochs),
                 OverfitDetectionCallback(),
-                WandbLoggingCallback(),
             ]
+            if use_wandb:
+                callbacks_list.append(WandbLoggingCallback())
+            else:
+                callbacks_list.append(TUILoggingCallback())
+            # Always-on callbacks: CSV logging + latest model save
+            run_path = f"{group_path}/{run_name}"
+            if not os.path.exists(run_path):
+                os.makedirs(run_path)
+            callbacks_list.append(CSVLoggingCallback(f"{run_path}/metrics.csv"))
+            callbacks_list.append(LatestModelCallback(f"{run_path}/latest_model.pt"))
+
             if run_config.early_stopping_config and run_config.early_stopping_config.enabled:
                 callbacks_list.append(
                     EarlyStoppingCallback(
@@ -259,10 +312,6 @@ def run(
                 callbacks_list.append(PrunerCallback(pruner, trial, seed))
 
             # Create CheckpointManager if enabled
-            run_path = f"{group_path}/{run_name}"
-            if not os.path.exists(run_path):
-                os.makedirs(run_path)
-
             if run_config.checkpoint_config.enabled:
                 config_hash = compute_config_hash(run_config)
                 ckpt_manager = CheckpointManager(
@@ -299,18 +348,21 @@ def run(
             # Mark seed as complete
             manifest.mark_complete(seed, val_loss)
 
-            wandb.finish()
+            if use_wandb:
+                wandb.finish()
 
             # Early stopping if loss becomes inf
             if math.isinf(val_loss):
                 break
 
     except optuna.TrialPruned:
-        wandb.finish()
+        if use_wandb:
+            wandb.finish()
         raise
     except Exception as e:
         tqdm.write(f"Runtime error during training: {e}")
-        wandb.finish()
+        if use_wandb:
+            wandb.finish()
         raise optuna.TrialPruned()
     finally:
         # Call trial_finished only once after all seeds are done

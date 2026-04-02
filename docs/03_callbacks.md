@@ -60,7 +60,7 @@ Trainer.val_epoch()
 
 ---
 
-## All 9 Built-in Callbacks
+## All 12 Built-in Callbacks
 
 ### 1. `NaNDetectionCallback` — priority 5
 
@@ -189,6 +189,36 @@ Supports `state_dict()` / `load_state_dict()` for checkpoint-resume compatibilit
 
 ---
 
+### 10. `CSVLoggingCallback` — priority 81
+
+**What it does:** Writes a CSV file (`metrics.csv`) with one row per epoch containing `epoch`, `train_loss`, `val_loss`, `lr`, and any available diagnostic metrics (`max_grad_norm`, `overfit_gap_ratio`, `predicted_final_loss`). The file is flushed after every epoch for real-time access.
+
+**When it fires:** `on_train_begin` (opens file), `on_epoch_end` (writes row), `on_train_end` (closes file)
+
+**Why it matters:** Always active regardless of the `logging` setting. Provides a lightweight, tool-agnostic record of the training run that can be used for loss curve plotting, post-hoc analysis, or agent monitoring — without requiring W&B.
+
+---
+
+### 11. `TUILoggingCallback` — priority 80
+
+**What it does:** Prints a formatted one-line summary to the terminal at every epoch. Shows `train_loss`, `val_loss`, `lr`, and optional diagnostics. Replaces `WandbLoggingCallback` when `logging: tui` is set in the config.
+
+**When it fires:** `on_train_begin`, `on_epoch_end`, `on_train_end`
+
+**Why it matters:** For agent-driven or CI/CD training workflows where W&B is not available or not desired, TUI logging provides clear, parseable terminal output. Each line follows a consistent `[epoch/total] | metric: value` format that agents can parse from stdout.
+
+---
+
+### 12. `LatestModelCallback` — priority 96
+
+**What it does:** Saves `model.state_dict()` to `latest_model.pt` in the run directory at the end of every epoch.
+
+**When it fires:** `on_epoch_end`
+
+**Why it matters:** Always active regardless of checkpoint config. Provides a lightweight, continuously-updated model snapshot (just the state dict, no optimizer/scheduler/RNG state). Useful for agents that need to inspect or evaluate the model mid-training.
+
+---
+
 ## Writing Custom Callbacks
 
 A custom callback needs only three things: a `priority`, and overrides for whichever hooks matter. Here is a complete example that tracks the best validation loss and prints a summary at the end of training:
@@ -245,9 +275,9 @@ The convention is that producer callbacks write to `trainer._<name>` and consume
 
 | Attribute | Written by | Read by | Semantics |
 |---|---|---|---|
-| `trainer._max_grad_norm` | `GradientMonitorCallback` (priority 12) | `WandbLoggingCallback` (priority 80) | Max gradient L2 norm for the current epoch |
-| `trainer._overfit_gap_ratio` | `OverfitDetectionCallback` (priority 75) | `WandbLoggingCallback` (priority 80) | `val_loss / train_loss` when divergence is detected; `None` otherwise |
-| `trainer._loss_prediction` | `LossPredictionCallback` (priority 70) | `WandbLoggingCallback` (priority 80) | Predicted final loss as `-log10(L)` |
+| `trainer._max_grad_norm` | `GradientMonitorCallback` (priority 12) | `WandbLoggingCallback` / `TUILoggingCallback` / `CSVLoggingCallback` | Max gradient L2 norm for the current epoch |
+| `trainer._overfit_gap_ratio` | `OverfitDetectionCallback` (priority 75) | `WandbLoggingCallback` / `CSVLoggingCallback` | `val_loss / train_loss` when divergence is detected; `None` otherwise |
+| `trainer._loss_prediction` | `LossPredictionCallback` (priority 70) | `WandbLoggingCallback` / `TUILoggingCallback` / `CSVLoggingCallback` | Predicted final loss as `-log10(L)` |
 
 Priority ordering enforces the producer-before-consumer contract. `GradientMonitorCallback` at priority 12 always finishes its `on_epoch_end` before `WandbLoggingCallback` at priority 80 starts its `on_epoch_end`. The `hasattr` guard on the consumer side means that if the producer callback is not present (e.g., in a minimal test setup), the consumer silently skips that metric rather than raising `AttributeError`.
 

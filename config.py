@@ -69,6 +69,7 @@ class RunConfig:
         default_factory=lambda: CheckpointConfig()
     )
     monitor: str = "val_loss"
+    logging: str = "wandb"  # "wandb" or "tui"
 
     def __post_init__(self):
         # ── Convert dicts to dataclass instances ──
@@ -101,6 +102,11 @@ class RunConfig:
             raise ValueError(
                 f"data must be in module.function format (contain at least one '.'), "
                 f"got '{self.data}'"
+            )
+
+        if self.logging not in ("wandb", "tui"):
+            raise ValueError(
+                f"logging must be 'wandb' or 'tui', got '{self.logging}'"
             )
 
         if self.early_stopping_config.enabled:

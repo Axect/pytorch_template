@@ -601,5 +601,42 @@ def analyze(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def monitor(
+    path: str = typer.Argument(
+        None, help="Path to metrics.csv or its parent directory"
+    ),
+    interval: int = typer.Option(500, help="Refresh interval in milliseconds"),
+):
+    """Launch the real-time TUI training monitor (Rust binary)."""
+    import os
+    import subprocess
+    import glob as glob_mod
+
+    monitor_bin = os.path.join(os.path.dirname(__file__), "tools", "monitor", "target", "release", "training-monitor")
+
+    if not os.path.exists(monitor_bin):
+        console.print("[yellow]Monitor binary not found. Building...[/yellow]")
+        cargo_dir = os.path.join(os.path.dirname(__file__), "tools", "monitor")
+        result = subprocess.run(["cargo", "build", "--release"], cwd=cargo_dir)
+        if result.returncode != 0:
+            console.print("[red]Failed to build monitor. Install Rust: https://rustup.rs[/red]")
+            raise typer.Exit(code=1)
+
+    if path is None:
+        # Auto-detect: find the most recently modified metrics.csv under runs/
+        candidates = glob_mod.glob("runs/**/metrics.csv", recursive=True)
+        if not candidates:
+            console.print("[red]No metrics.csv found under runs/. Specify a path.[/red]")
+            raise typer.Exit(code=1)
+        path = max(candidates, key=os.path.getmtime)
+        console.print(f"[dim]Auto-detected: {path}[/dim]")
+
+    try:
+        subprocess.run([monitor_bin, path, "--interval", str(interval)])
+    except KeyboardInterrupt:
+        pass
+
+
 if __name__ == "__main__":
     app()

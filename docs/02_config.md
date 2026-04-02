@@ -69,6 +69,7 @@ All fields are required unless a default is shown.
 | `early_stopping_config` | `EarlyStoppingConfig` | disabled | Early stopping settings (see below) |
 | `checkpoint_config` | `CheckpointConfig` | disabled | Checkpoint saving settings (see below) |
 | `monitor` | `str` | `"val_loss"` | Metric to track for best-model selection |
+| `logging` | `str` | `"wandb"` | `"wandb"` for W&B logging, `"tui"` for agent-friendly terminal logging |
 
 **`EarlyStoppingConfig` sub-fields:** `enabled` (bool, default `False`), `patience` (int, default `10`), `mode` (`"min"`/`"max"`, default `"min"`), `min_delta` (float, default `0.0001`).
 

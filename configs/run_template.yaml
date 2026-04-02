@@ -1,5 +1,6 @@
 project: PyTorch_Template
 device: cuda:0
+logging: wandb  # 'wandb' or 'tui' (agent-friendly terminal logging)
 net: model.MLP
 optimizer: pytorch_optimizer.SPlus
 scheduler: pytorch_scheduler.ExpHyperbolicLRScheduler

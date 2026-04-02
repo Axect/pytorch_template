@@ -137,18 +137,17 @@ class PFLPruner(BasePruner):
         return avg_train_loss, avg_pfl
 
     def _predict_final_loss(self, losses: List[float]) -> float:
-        """Predict final loss value using the loss history."""
+        """Predict final loss value using the loss history.
+
+        Returns raw predicted loss (lower is better for minimization).
+        """
         if len(losses) < 2:
-            return -float("inf")
+            return float("inf")
 
         try:
-            return (
-                -np.log10(losses[-1])
-                if len(losses) < 10
-                else predict_final_loss(losses, self.target_epoch)
-            )
-        except:
-            return -float("inf")
+            return predict_final_loss(losses, self.target_epoch)
+        except Exception:
+            return float("inf")
 
     def _should_insert_pair(self, train_loss: float) -> bool:
         """Check if a new pair should be inserted based on validation loss."""
@@ -187,9 +186,9 @@ class PFLPruner(BasePruner):
         # Compute current metrics
         _, curr_pfl = self._compute_trial_metrics(trial)
 
-        # Prune if PFL is worse than all saved PFLs
+        # Prune if predicted loss is worse (higher) than worst saved prediction
         if self.top_pairs:  # Only if we have recorded pairs
-            worst_pfl = min(pair[1] for pair in self.top_pairs)
-            return curr_pfl < worst_pfl
+            worst_pred = max(pair[1] for pair in self.top_pairs)
+            return curr_pfl > worst_pred
 
         return False

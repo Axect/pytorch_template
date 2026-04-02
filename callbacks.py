@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
+import csv
+import io
 import math
 
 if TYPE_CHECKING:
@@ -281,3 +283,104 @@ class CheckpointCallback(TrainingCallback):
             epoch, trainer.model, trainer.optimizer, trainer.scheduler,
             val_loss, metrics, early_stopping_state, self.config_hash,
         )
+
+
+class CSVLoggingCallback(TrainingCallback):
+    """Logs metrics to a CSV file every epoch (always active).
+
+    Handles dynamic columns: if new metrics appear mid-training,
+    the CSV is rewritten with the expanded header and all prior rows.
+    """
+    priority = 81
+
+    def __init__(self, csv_path: str):
+        self.csv_path = csv_path
+        self._fieldnames: list[str] = []
+        self._rows: list[dict] = []
+
+    def _collect_metrics(self, trainer, epoch, train_loss, val_loss, metrics):
+        row = {
+            "epoch": epoch,
+            "train_loss": train_loss,
+            "val_loss": val_loss,
+            "lr": trainer.optimizer.param_groups[0]["lr"],
+        }
+        row.update(metrics)
+        grad = getattr(trainer, '_max_grad_norm', None)
+        row["max_grad_norm"] = grad if grad is not None else ""
+        gap = getattr(trainer, '_overfit_gap_ratio', None)
+        row["overfit_gap_ratio"] = gap if gap is not None else ""
+        pred = getattr(trainer, '_loss_prediction', None)
+        row["predicted_final_loss"] = pred if pred is not None else ""
+        return row
+
+    def on_epoch_end(self, trainer, epoch, train_loss, val_loss, metrics, **kwargs):
+        row = self._collect_metrics(trainer, epoch, train_loss, val_loss, metrics)
+        new_keys = [k for k in row if k not in self._fieldnames]
+        self._rows.append(row)
+
+        if new_keys:
+            # New columns appeared — expand header and rewrite everything
+            self._fieldnames.extend(new_keys)
+            self._flush_all()
+        else:
+            # Fast path — append one row
+            with open(self.csv_path, "a", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=self._fieldnames, restval="")
+                writer.writerow(row)
+
+    def _flush_all(self):
+        """Rewrite the entire CSV with the current (possibly expanded) header."""
+        with open(self.csv_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=self._fieldnames, restval="")
+            writer.writeheader()
+            writer.writerows(self._rows)
+
+
+class TUILoggingCallback(TrainingCallback):
+    """Agent-friendly terminal logging (replaces wandb)."""
+    priority = 80
+
+    def on_train_begin(self, trainer, **kwargs):
+        from tqdm import tqdm
+        epochs = kwargs.get("epochs", "?")
+        tqdm.write(f"{'='*60}")
+        tqdm.write(f"Training started  |  epochs: {epochs}")
+        tqdm.write(f"{'='*60}")
+
+    def on_epoch_end(self, trainer, epoch, train_loss, val_loss, metrics, **kwargs):
+        from tqdm import tqdm
+        parts = [
+            f"[{epoch+1:>4d}/{trainer._total_epochs}]",
+            f"train: {train_loss:.4e}",
+            f"val: {val_loss:.4e}",
+            f"lr: {trainer.optimizer.param_groups[0]['lr']:.4e}",
+        ]
+        for k, v in metrics.items():
+            if isinstance(v, float):
+                parts.append(f"{k}: {v:.4e}")
+
+        if hasattr(trainer, '_max_grad_norm') and trainer._max_grad_norm is not None:
+            parts.append(f"grad: {trainer._max_grad_norm:.2e}")
+        if hasattr(trainer, '_loss_prediction') and trainer._loss_prediction is not None:
+            parts.append(f"pred: {trainer._loss_prediction:.4e}")
+
+        tqdm.write(" | ".join(parts))
+
+    def on_train_end(self, trainer, **kwargs):
+        from tqdm import tqdm
+        tqdm.write(f"{'='*60}")
+        tqdm.write("Training complete")
+        tqdm.write(f"{'='*60}")
+
+
+class LatestModelCallback(TrainingCallback):
+    """Saves latest model state_dict every epoch."""
+    priority = 96
+
+    def __init__(self, save_path: str):
+        self.save_path = save_path
+
+    def on_epoch_end(self, trainer, epoch, train_loss, val_loss, metrics, **kwargs):
+        import torch
+        torch.save(trainer.model.state_dict(), self.save_path)

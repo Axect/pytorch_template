@@ -1,4 +1,5 @@
 /target
+tools/monitor/target/
 data/*.parquet
 *.db
 

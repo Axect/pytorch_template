@@ -1,0 +1,15 @@
+[package]
+name = "training-monitor"
+version = "0.1.0"
+edition = "2021"
+description = "Real-time TUI training monitor for pytorch_template"
+
+[dependencies]
+ratatui = "0.30"
+csv = "1"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+
+[profile.release]
+lto = true
+strip = true
