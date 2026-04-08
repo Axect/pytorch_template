@@ -116,41 +116,89 @@ fn render_overview(frame: &mut Frame, app: &HpoApp, area: Rect) {
         summary_area,
     );
 
-    // Convergence curve
+    // All trial values scatter + best convergence line
     let curve = app.convergence_curve();
-    if curve.is_empty() {
+
+    // Collect all trial objective values as scatter points
+    let all_scatter: Vec<(f64, f64)> = app
+        .hpo_data
+        .trials
+        .iter()
+        .filter_map(|t| {
+            if t.state == TrialState::Complete {
+                t.value.map(|v| (t.number as f64, v))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if curve.is_empty() && all_scatter.is_empty() {
         frame.render_widget(
             Paragraph::new(" Waiting for completed trials...")
-                .block(Block::bordered().title(" Best Value Convergence ")),
+                .block(Block::bordered().title(" Objective Values ")),
             chart_area,
         );
         return;
     }
 
-    let data: Vec<(f64, f64)> = if app.log_y {
+    // Transform for log scale
+    let scatter_data: Vec<(f64, f64)> = if app.log_y {
+        all_scatter.iter().map(|&(x, y)| (x, y.max(1e-20).log10())).collect()
+    } else {
+        all_scatter.clone()
+    };
+
+    let best_data: Vec<(f64, f64)> = if app.log_y {
         curve.iter().map(|&(x, y)| (x, y.max(1e-20).log10())).collect()
     } else {
         curve.clone()
     };
 
-    let x_max = data.last().map(|(x, _)| x + 1.0).unwrap_or(1.0);
-    let (y_min, y_max) = min_max_y(&data);
+    // Compute bounds from both datasets
+    let all_points: Vec<&(f64, f64)> = scatter_data.iter().chain(best_data.iter()).collect();
+    let x_max = all_points.iter().map(|(x, _)| *x).fold(0.0_f64, f64::max) + 1.0;
+    let y_min = all_points.iter().map(|(_, y)| *y).fold(f64::INFINITY, f64::min);
+    let y_max = all_points.iter().map(|(_, y)| *y).fold(f64::NEG_INFINITY, f64::max);
     let y_pad = (y_max - y_min).max(1e-10) * 0.1;
     let y_lo = y_min - y_pad;
     let y_hi = y_max + y_pad;
 
-    let datasets = vec![Dataset::default()
-        .name("best")
-        .marker(symbols::Marker::Braille)
-        .graph_type(GraphType::Line)
-        .style(Style::new().fg(Color::Green))
-        .data(&data)];
+    let mut datasets = vec![];
 
-    let title = if app.log_y {
-        " Best Value Convergence (log\u{2081}\u{2080}) "
-    } else {
-        " Best Value Convergence "
-    };
+    // Scatter first (behind the line)
+    if !scatter_data.is_empty() {
+        datasets.push(
+            Dataset::default()
+                .name("trials")
+                .marker(symbols::Marker::Braille)
+                .graph_type(GraphType::Scatter)
+                .style(Style::new().fg(Color::DarkGray))
+                .data(&scatter_data),
+        );
+    }
+
+    // Best convergence line on top
+    if !best_data.is_empty() {
+        datasets.push(
+            Dataset::default()
+                .name("best")
+                .marker(symbols::Marker::Braille)
+                .graph_type(GraphType::Line)
+                .style(Style::new().fg(Color::Green))
+                .data(&best_data),
+        );
+    }
+
+    let title = Line::from(vec![
+        Span::raw(if app.log_y {
+            " Objective Values (log\u{2081}\u{2080}) "
+        } else {
+            " Objective Values "
+        }),
+        Span::styled("· trials ", Style::new().fg(Color::DarkGray)),
+        Span::styled("━ best ", Style::new().fg(Color::Green)),
+    ]);
 
     let x_labels = make_labels(0.0, x_max, 5, false);
     let y_labels = if app.log_y {
