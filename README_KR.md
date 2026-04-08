@@ -92,6 +92,12 @@ python -m cli analyze        ← 결과 검증 및 플롯 생성
 
 ## AI 보조 학습 (Claude Code Skill)
 
+<div align="center">
+
+![AI Skills Pipeline](assets/ai_skills_pipeline.png)
+
+</div>
+
 이 템플릿에는 전체 실험 생애주기를 안내하는 내장 [Claude Code](https://claude.ai/claude-code) skill이 포함되어 있습니다:
 
 ```
@@ -117,8 +123,8 @@ Agent: configs/SolarFlux_v0.3/fluxnet_run.yaml 생성
 **글로벌 skill 설치** (최초 1회):
 
 ```bash
-mkdir -p ~/.claude/skills
-cp -r .claude/skills/pytorch-migrate ~/.claude/skills/
+python -m cli update-skills          # 심볼릭 링크 (git pull 시 자동 업데이트)
+python -m cli update-skills --copy   # 또는 파일 복사
 ```
 
 **다른 프로젝트에서 사용:**
@@ -236,6 +242,44 @@ class GradientClipCallback(TrainingCallback):
     def on_train_step_end(self, trainer, **kwargs):
         torch.nn.utils.clip_grad_norm_(trainer.model.parameters(), 1.0)
 ```
+
+### 실시간 TUI 모니터
+
+**Rust 기반** 터미널 UI가 `metrics.csv`를 읽어 실시간 차트를 렌더링합니다:
+
+<div align="center">
+
+![TUI Monitor](assets/tui_demo.png)
+
+</div>
+
+**주요 기능:**
+- Braille 서브픽셀 렌더링을 활용한 손실 곡선 (train/val)
+- 학습률 스케줄 및 그래디언트 norm 이력
+- 예측 최종 손실 오버레이
+- 로그 스케일 토글: 양수 데이터는 `log₁₀`, 혼합 부호는 `symlog₁₀`
+- 현재 지표 및 마지막 업데이트 이후 경과 시간을 표시하는 상태 표시줄
+- 1.2 MB 정적 바이너리 — 런타임 의존성 없음
+
+**사용법:**
+
+```bash
+# 최초 1회 빌드 (Rust 툴체인 필요)
+cd tools/monitor && cargo build --release && cd ../..
+
+# 학습과 병행 실행 (별도 터미널에서)
+python -m cli monitor                                      # 최신 런 자동 감지
+python -m cli monitor runs/MyProject/group/42/metrics.csv  # 특정 파일 지정
+
+# 또는 바이너리 직접 실행
+./tools/monitor/target/release/training-monitor runs/MyProject/group/42/
+```
+
+| 키 | 동작 |
+|----|------|
+| `q` / `Esc` | 종료 |
+| `l` | 로그 스케일 토글 |
+| `←` / `→` | 메트릭 탭 전환 (커스텀 메트릭 로깅 시) |
 
 ### Pre-flight 검사
 
@@ -368,10 +412,10 @@ data: recipes.myproject.data.load_data
 
 ```
 pytorch_template/
-├── cli.py              # CLI: train, preflight, validate, preview, doctor, analyze, hpo-report
+├── cli.py              # CLI: train, preflight, validate, preview, doctor, analyze, hpo-report, monitor, update-skills
 ├── config.py           # RunConfig (frozen, 3단계 검증) + OptimizeConfig
 ├── util.py             # Trainer, run(), 데이터 로딩
-├── callbacks.py        # 9개 내장 콜백 + CallbackRunner
+├── callbacks.py        # 12개 내장 콜백 + CallbackRunner
 ├── checkpoint.py       # CheckpointManager + SeedManifest
 ├── provenance.py       # 환경 캡처 + 설정 해싱
 ├── pruner.py           # Optuna용 PFL 프루너
@@ -397,6 +441,8 @@ pytorch_template/
 | `python -m cli doctor` | Python, PyTorch, CUDA, wandb, 필수 패키지 확인 |
 | `python -m cli hpo-report [--db DB] [--opt-config OPT] [--top-k K] [--json]` | HPO 결과 분석: 파라미터 중요도, 경계 경고, 상위-K |
 | `python -m cli analyze [--project P] [--group G] [--seed S] [--device DEV]` | 학습된 모델 체크포인트 평가 |
+| `python -m cli monitor [PATH] [--interval MS] [--list]` | 실시간 TUI 모니터 실행 (또는 가용한 런 목록 표시) |
+| `python -m cli update-skills [--copy] [--uninstall]` | Claude Code skill을 ~/.claude/skills/에 설치/업데이트 |
 
 ## 라이선스
 
