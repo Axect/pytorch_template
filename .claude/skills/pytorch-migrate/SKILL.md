@@ -23,6 +23,23 @@ If `project_path` is omitted, uses the current working directory.
 
 ---
 
+## Step 0: Clone the Template
+
+Clone the latest template into a temporary directory. All code references during migration come from this clone — never from embedded snippets.
+
+```bash
+TEMPLATE_DIR=$(mktemp -d)
+git clone --depth 1 https://github.com/Axect/pytorch_template.git "$TEMPLATE_DIR"
+```
+
+Use `$TEMPLATE_DIR` as the source of truth for all file contents throughout the migration. After migration is complete, clean up:
+
+```bash
+rm -rf "$TEMPLATE_DIR"
+```
+
+---
+
 ## Step 1: Detect Current Version
 
 Read the project's files and determine which version it's based on by checking for feature markers.
@@ -65,7 +82,7 @@ test -f provenance.py && echo "1" || echo "0"
 
 Apply only the migrations that are needed, in order. Each migration is independent and idempotent.
 
-Read `references/migrations.md` for the detailed migration steps.
+Read `references/migrations.md` for the structural migration guide. Each migration describes WHICH files, classes, and methods to copy from `$TEMPLATE_DIR` and HOW to wire them into the user's project. Read the actual source files from `$TEMPLATE_DIR` to get the current code.
 
 ### Migration Summary
 
