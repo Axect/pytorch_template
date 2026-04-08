@@ -361,7 +361,17 @@ Changes from previous version:
 
 Changes needed:
 - Add `hpo: bool = typer.Option(False, "--hpo", help="HPO monitor mode")` parameter to existing `monitor` command
-- Add HPO branch before the existing `if list_runs:` block: auto-detect `.db` files (beaupy selection if multiple), resolve and build monitor binary (same as training mode), launch `training-monitor --hpo <db_path> --interval <interval>`
+- Add `y_min` and `y_max` optional float parameters for Y-axis bounds
+- Add HPO branch before the existing `if list_runs:` block: auto-detect `.db` files (beaupy selection if multiple), resolve and build monitor binary (same as training mode), launch `training-monitor --hpo <db_path> --interval <interval>`, pass `--y-min`/`--y-max` if specified
+
+### Documentation files
+
+**Action:** These files are NOT migrated automatically — they are part of the template and should be copied/replaced from `$TEMPLATE_DIR` if the user wants updated docs:
+
+- `docs/04_hpo.md` — new section "Monitoring HPO in Real-time" (tab reference, key bindings, usage guidance)
+- `docs/01_pipeline.md` — Phase 4 now mentions `monitor --hpo` for real-time monitoring
+- `README.md` — HPO Monitoring subsection under TUI Monitor
+- `README_KR.md` — Korean translation of HPO monitoring section
 
 ---
 
