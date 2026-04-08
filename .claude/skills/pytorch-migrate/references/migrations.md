@@ -274,11 +274,11 @@ Changes needed:
 Fields to add:
 - `logging:` — value is either `wandb` or `tui`; add after the `device:` field
 
-### tools/monitor/ (optional Rust TUI)
+### tools/monitor/ (Rust TUI)
 
-**Action:** Copy directory from `$TEMPLATE_DIR/tools/monitor/` if the user wants the real-time TUI
+**Action:** Copy directory from `$TEMPLATE_DIR/tools/monitor/`
 
-The directory contains a Rust workspace with a binary crate `training-monitor`. It reads `metrics.csv` in real time and renders a live terminal dashboard with loss curves, learning rate, and gradient norm plots. It is optional — the `monitor` CLI command builds it automatically on first use via `cargo build --release`. The `CSVLoggingCallback` that feeds it is always active regardless of whether the binary is present.
+The directory contains a Rust workspace with a binary crate `training-monitor`. It reads `metrics.csv` in real time and renders a live terminal dashboard with loss curves, learning rate, and gradient norm plots. The `monitor` CLI command builds it automatically on first use via `cargo build --release`. Requires a Rust toolchain (`rustc` / `cargo`).
 
 ---
 
