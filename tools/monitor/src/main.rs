@@ -12,7 +12,7 @@ use ratatui::{
     style::{Color, Style, Stylize},
     symbols,
     text::{Line, Span},
-    widgets::{Axis, Block, Chart, Dataset, GraphType, Paragraph},
+    widgets::{Axis, Block, Chart, Dataset, GraphType, Paragraph, Tabs},
     Frame,
 };
 
@@ -39,6 +39,8 @@ struct MetricRow {
     lr: f64,
     max_grad_norm: Option<f64>,
     predicted_final_loss: Option<f64>,
+    /// Extra columns (parallel to App::extra_columns)
+    extras: Vec<Option<f64>>,
 }
 
 // ── App State ──────────────────────────────────────────────────────────────
@@ -53,6 +55,10 @@ struct App {
     has_nonpositive: bool,
     /// symlog threshold: smallest |loss| > 0 in the data
     symlog_c: f64,
+    /// Currently active tab: 0 = Overview, 1+ = extra columns
+    active_tab: usize,
+    /// Names of dynamically detected extra CSV columns
+    extra_columns: Vec<String>,
 }
 
 impl App {
@@ -65,6 +71,8 @@ impl App {
             log_scale: false,
             has_nonpositive: false,
             symlog_c: 1.0,
+            active_tab: 0,
+            extra_columns: Vec::new(),
         }
     }
 
@@ -87,6 +95,28 @@ impl App {
             return;
         };
 
+        // Detect extra columns (anything not in the known set)
+        const KNOWN: &[&str] = &[
+            "epoch",
+            "train_loss",
+            "val_loss",
+            "lr",
+            "max_grad_norm",
+            "predicted_final_loss",
+        ];
+        let new_extras: Vec<String> = headers
+            .iter()
+            .filter(|h| !KNOWN.contains(&h))
+            .map(String::from)
+            .collect();
+
+        // Merge with existing extra_columns (append new ones, preserve order)
+        for col in &new_extras {
+            if !self.extra_columns.contains(col) {
+                self.extra_columns.push(col.clone());
+            }
+        }
+
         let mut rows = Vec::new();
         for result in rdr.records() {
             let Ok(record) = result else { continue };
@@ -98,6 +128,9 @@ impl App {
                     .and_then(|v| v.parse().ok())
             };
 
+            let extras: Vec<Option<f64>> =
+                self.extra_columns.iter().map(|col| get(col)).collect();
+
             rows.push(MetricRow {
                 epoch: get("epoch").unwrap_or(0.0),
                 train_loss: get("train_loss").unwrap_or(0.0),
@@ -105,7 +138,14 @@ impl App {
                 lr: get("lr").unwrap_or(0.0),
                 max_grad_norm: get("max_grad_norm"),
                 predicted_final_loss: get("predicted_final_loss"),
+                extras,
             });
+        }
+
+        // Clamp active_tab if columns were removed
+        let total_tabs = 1 + self.extra_columns.len();
+        if self.active_tab >= total_tabs {
+            self.active_tab = 0;
         }
 
         // Detect sign characteristics for log-scale mode selection
@@ -175,14 +215,29 @@ impl App {
             .map(|d| d.as_secs())
     }
 
+    fn total_tabs(&self) -> usize {
+        1 + self.extra_columns.len()
+    }
+
     fn handle_event(&mut self, ev: Event) -> bool {
         if let Event::Key(key) = ev {
             if key.kind != KeyEventKind::Press {
                 return false;
             }
+            let n = self.total_tabs();
             match key.code {
                 KeyCode::Char('q') | KeyCode::Esc => return true,
                 KeyCode::Char('l') => self.log_scale = !self.log_scale,
+                KeyCode::Right | KeyCode::Tab => {
+                    if n > 1 {
+                        self.active_tab = (self.active_tab + 1) % n;
+                    }
+                }
+                KeyCode::Left | KeyCode::BackTab => {
+                    if n > 1 {
+                        self.active_tab = (self.active_tab + n - 1) % n;
+                    }
+                }
                 _ => {}
             }
         }
@@ -237,33 +292,179 @@ fn run_app(terminal: &mut ratatui::DefaultTerminal, app: &mut App) -> Result<()>
 // ── Rendering ──────────────────────────────────────────────────────────────
 
 fn render(frame: &mut Frame, app: &App) {
-    let has_grad = app.metrics.iter().any(|m| m.max_grad_norm.is_some());
+    let has_tabs = !app.extra_columns.is_empty();
 
-    if has_grad {
-        let [loss_area, lr_area, grad_area, status_area] = Layout::vertical([
-            Constraint::Percentage(45),
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
+    if has_tabs {
+        // Tab bar + content + status
+        let [tab_area, content_area, status_area] = Layout::vertical([
+            Constraint::Length(2),
+            Constraint::Min(0),
             Constraint::Length(3),
         ])
         .areas(frame.area());
+
+        render_tab_bar(frame, app, tab_area);
+
+        if app.active_tab == 0 {
+            render_overview(frame, app, content_area);
+        } else {
+            render_extra_tab(frame, app, content_area, app.active_tab - 1);
+        }
+
+        render_status(frame, app, status_area);
+    } else {
+        // No extra columns — original layout without tab bar
+        let [content_area, status_area] = Layout::vertical([
+            Constraint::Min(0),
+            Constraint::Length(3),
+        ])
+        .areas(frame.area());
+
+        render_overview(frame, app, content_area);
+        render_status(frame, app, status_area);
+    }
+}
+
+fn render_tab_bar(frame: &mut Frame, app: &App, area: Rect) {
+    let mut titles: Vec<Line> = vec![Line::from(" Overview ")];
+    for col in &app.extra_columns {
+        titles.push(Line::from(format!(" {} ", col)));
+    }
+
+    let tabs = Tabs::new(titles)
+        .select(app.active_tab)
+        .style(Style::new().fg(Color::DarkGray))
+        .highlight_style(Style::new().fg(Color::Cyan).bold())
+        .divider(Span::raw("│"));
+
+    frame.render_widget(tabs, area);
+}
+
+fn render_overview(frame: &mut Frame, app: &App, area: Rect) {
+    let has_grad = app.metrics.iter().any(|m| m.max_grad_norm.is_some());
+
+    if has_grad {
+        let [loss_area, lr_area, grad_area] = Layout::vertical([
+            Constraint::Percentage(50),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+        ])
+        .areas(area);
 
         render_loss_chart(frame, app, loss_area);
         render_lr_chart(frame, app, lr_area);
         render_grad_chart(frame, app, grad_area);
-        render_status(frame, app, status_area);
     } else {
-        let [loss_area, lr_area, status_area] = Layout::vertical([
+        let [loss_area, lr_area] = Layout::vertical([
             Constraint::Percentage(65),
-            Constraint::Percentage(22),
-            Constraint::Length(3),
+            Constraint::Percentage(35),
         ])
-        .areas(frame.area());
+        .areas(area);
 
         render_loss_chart(frame, app, loss_area);
         render_lr_chart(frame, app, lr_area);
-        render_status(frame, app, status_area);
     }
+}
+
+const EXTRA_COLORS: &[Color] = &[
+    Color::Cyan,
+    Color::Magenta,
+    Color::Green,
+    Color::Yellow,
+    Color::Red,
+    Color::Blue,
+];
+
+fn render_extra_tab(frame: &mut Frame, app: &App, area: Rect, col_idx: usize) {
+    let col_name = &app.extra_columns[col_idx];
+    let data: Vec<(f64, f64)> = app
+        .metrics
+        .iter()
+        .filter_map(|m| {
+            m.extras
+                .get(col_idx)
+                .copied()
+                .flatten()
+                .map(|v| (m.epoch, v))
+        })
+        .collect();
+
+    if data.is_empty() {
+        frame.render_widget(
+            Paragraph::new(format!(" No data for column '{}'", col_name))
+                .block(Block::bordered().title(format!(" {} ", col_name))),
+            area,
+        );
+        return;
+    }
+
+    let has_negative = data.iter().any(|(_, y)| *y < 0.0);
+    let color = EXTRA_COLORS[col_idx % EXTRA_COLORS.len()];
+
+    if has_negative {
+        // Use loss-style rendering (supports symlog for negative values)
+        render_generic_chart(frame, app, area, &data, col_name, col_name, color);
+    } else {
+        render_positive_chart(frame, app, area, &data, col_name, col_name, color);
+    }
+}
+
+/// Chart renderer for data that may contain negative values.
+/// Applies the same log/symlog transform as the loss chart.
+fn render_generic_chart(
+    frame: &mut Frame,
+    app: &App,
+    area: Rect,
+    raw_data: &[(f64, f64)],
+    name: &str,
+    y_title: &str,
+    color: Color,
+) {
+    let data: Vec<(f64, f64)> = raw_data
+        .iter()
+        .map(|&(x, y)| (x, app.loss_y(y)))
+        .collect();
+
+    let x_max = data.last().map(|(x, _)| x + 1.0).unwrap_or(1.0);
+    let (y_min, y_max) = min_max_y(&data);
+    let y_pad = (y_max - y_min).max(1e-10) * 0.1;
+    let y_lo = y_min - y_pad;
+    let y_hi = y_max + y_pad;
+
+    let datasets = vec![Dataset::default()
+        .name(name)
+        .marker(symbols::Marker::Braille)
+        .graph_type(GraphType::Line)
+        .style(Style::new().fg(color))
+        .data(&data)];
+
+    let title = if app.log_scale {
+        format!(" {} (log\u{2081}\u{2080}) ", name)
+    } else {
+        format!(" {} ", name)
+    };
+
+    let x_labels = make_labels(0.0, x_max, 5, false);
+    let y_labels = app.make_loss_labels(y_lo, y_hi, 5);
+
+    let chart = Chart::new(datasets)
+        .block(Block::bordered().title(title))
+        .x_axis(
+            Axis::default()
+                .title("epoch")
+                .style(Style::new().fg(Color::DarkGray))
+                .bounds([0.0, x_max])
+                .labels(x_labels),
+        )
+        .y_axis(
+            Axis::default()
+                .title(y_title)
+                .style(Style::new().fg(Color::DarkGray))
+                .bounds([y_lo, y_hi])
+                .labels(y_labels),
+        );
+
+    frame.render_widget(chart, area);
 }
 
 fn render_loss_chart(frame: &mut Frame, app: &App, area: Rect) {
@@ -505,16 +706,29 @@ fn render_status(frame: &mut Frame, app: &App, area: Rect) {
             (true, true) => " [SYMLOG]",
         };
 
+        let tab_hint = if app.extra_columns.is_empty() {
+            ""
+        } else {
+            " │ ←→: tabs"
+        };
+
         format!(
-            " {} │ updated {}\n q: quit │ l: log scale{}",
+            " {} │ updated {}\n q: quit │ l: log scale{}{}",
             parts.join(" │ "),
             elapsed,
             log_tag,
+            tab_hint,
         )
     } else {
+        let tab_hint = if app.extra_columns.is_empty() {
+            ""
+        } else {
+            " │ ←→: tabs"
+        };
         format!(
-            " Waiting: {} │ q: quit │ l: log scale",
-            app.csv_path.display()
+            " Waiting: {} │ q: quit │ l: log scale{}",
+            app.csv_path.display(),
+            tab_hint,
         )
     };
 

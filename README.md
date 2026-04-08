@@ -185,6 +185,7 @@ python -m cli monitor runs/MyProject/group/42/metrics.csv  # specific file
 |-----|--------|
 | `q` / `Esc` | Quit |
 | `l` | Toggle log scale |
+| `←` / `→` | Switch metric tabs (when custom metrics are logged) |
 
 ---
 
@@ -252,6 +253,12 @@ A boundary warning means the optimizer would benefit from a wider search range.
 
 ## AI-Assisted Training (Claude Code Skill)
 
+<div align="center">
+
+![AI Skills Pipeline](assets/ai_skills_pipeline.png)
+
+</div>
+
 This template ships with a built-in [Claude Code](https://claude.ai/claude-code) skill that guides you through the entire experiment lifecycle:
 
 ```
@@ -274,11 +281,11 @@ The skill encodes domain knowledge: correct lr ranges for SPlus (1e-3 to 1e+0), 
 
 If you have a project based on an older version of this template, the **pytorch-migrate** skill can detect your current version and apply incremental updates automatically.
 
-**Install the skill globally** (once):
+**Install skills globally** (once):
 
 ```bash
-mkdir -p ~/.claude/skills
-cp -r .claude/skills/pytorch-migrate ~/.claude/skills/
+python -m cli update-skills          # symlink (auto-updates with git pull)
+python -m cli update-skills --copy   # or copy if you prefer
 ```
 
 **Use in any project:**
@@ -406,7 +413,8 @@ runs/{project}/{group}/{seed}/
 | `doctor` | Check Python, PyTorch, CUDA, wandb, packages |
 | `hpo-report [--db DB] [--opt-config OPT] [--top-k K] [--json]` | HPO analysis: param importance, boundary warnings |
 | `analyze [--project P] [--group G] [--seed S]` | Evaluate a trained model |
-| `monitor [PATH] [--interval MS]` | Launch real-time TUI monitor |
+| `monitor [PATH] [--interval MS] [--list]` | Launch real-time TUI monitor (or list available runs) |
+| `update-skills [--copy] [--uninstall]` | Install/update Claude Code skills to ~/.claude/skills/ |
 
 All commands are invoked via `python -m cli <command>`.
 
