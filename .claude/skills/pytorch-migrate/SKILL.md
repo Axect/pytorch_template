@@ -60,6 +60,7 @@ Run these checks **in order** — the first missing feature determines the start
 | `callbacks.py` has `CSVLoggingCallback` | Class exists | v6 (pre-dual-logging) |
 | `config.py` has `logging` field in RunConfig | `logging: str` in RunConfig | v6 (pre-dual-logging) |
 | `provenance.py` exists | File exists | v6 (pre-provenance) |
+| `cli.py` has `update_skills` command | `def update_skills` exists | v7 (pre-TUI-tabs) |
 | All checks pass | — | Current (up to date) |
 
 ```bash
@@ -74,6 +75,7 @@ grep -c "def hpo_report" cli.py 2>/dev/null || echo "0"
 grep -c "class CSVLoggingCallback" callbacks.py 2>/dev/null || echo "0"
 grep -c "logging: str" config.py 2>/dev/null || echo "0"
 test -f provenance.py && echo "1" || echo "0"
+grep -c "def update_skills" cli.py 2>/dev/null || echo "0"
 ```
 
 ---
@@ -93,7 +95,8 @@ Read `references/migrations.md` for the structural migration guide. Each migrati
 | M3: Modular CLI | v3→v4 | Add `cli.py` with typer, refactor `main.py` |
 | M4: Data Decoupling | v4→v5 | Add `data` field to `RunConfig`, add `load_data()` method, update CLI |
 | M5: Diagnostics + Preflight + HPO Report | v5→v6 | Add callbacks, CLI commands, `validate_semantics()` |
-| M6: Dual Logging + TUI Monitor + Provenance | v6→current | Add `CSVLoggingCallback`, `TUILoggingCallback`, `LatestModelCallback`, `provenance.py`, `logging` field, `doctor`/`monitor` CLI |
+| M6: Dual Logging + TUI Monitor + Provenance | v6→v7 | Add `CSVLoggingCallback`, `TUILoggingCallback`, `LatestModelCallback`, `provenance.py`, `logging` field, `doctor`/`monitor` CLI |
+| M7: TUI Monitor Tabs + CLI Enhancements | v7→current | TUI monitor dynamic column tabs, `monitor --list`, `update-skills` CLI command |
 
 ---
 
