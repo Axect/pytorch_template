@@ -15,7 +15,7 @@
 
 *Config-driven experiment pipeline with dual logging, real-time TUI monitor, and AI agent skills.*
 
-![Pipeline Overview](assets/pipeline.png)
+![Pipeline Overview](assets/ai_skills_pipeline.png)
 
 </div>
 
@@ -252,12 +252,6 @@ A boundary warning means the optimizer would benefit from a wider search range.
 ---
 
 ## AI-Assisted Training (Claude Code Skill)
-
-<div align="center">
-
-![AI Skills Pipeline](assets/ai_skills_pipeline.png)
-
-</div>
 
 This template ships with a built-in [Claude Code](https://claude.ai/claude-code) skill that guides you through the entire experiment lifecycle:
 
