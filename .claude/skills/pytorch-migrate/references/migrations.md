@@ -303,7 +303,7 @@ If you add custom metrics to the CSV, you must update all three locations or the
 
 ---
 
-## M7: TUI Monitor Tabs + CLI Enhancements (v7 → current)
+## M7: TUI Monitor Tabs + CLI Enhancements (v7 → v8)
 
 **Detect:** `grep -c "def update_skills" cli.py` returns 0
 
@@ -334,6 +334,34 @@ Changes needed:
    - Add the `--list` branch at the top of the function body (before the monitor binary resolution). Copy the `if list_runs:` block from `$TEMPLATE_DIR/cli.py` — it calls `_list_runs()`, renders a Rich table, then uses `beaupy.select()` for interactive run selection and launches the monitor for the chosen run
 
 3. **Add `update_skills` command** — copy from `$TEMPLATE_DIR/cli.py`, search for `def update_skills`. Place it before `if __name__ == "__main__":`. This command uses `import shutil` and `from pathlib import Path` (imported inside the function). It resolves template skills at `.claude/skills/` relative to `__file__`, installs as symlink by default (or copy with `--copy`) to `~/.claude/skills/`, and supports `--uninstall`
+
+---
+
+## M8: HPO TUI Monitor (v8 → current)
+
+**Detect:** `test -f tools/monitor/src/hpo/mod.rs` fails
+
+### tools/monitor/
+
+**Action:** Replace from `$TEMPLATE_DIR/tools/monitor/`
+
+Changes from previous version:
+- `Cargo.toml` gains `rusqlite = { version = "0.35", features = ["bundled"] }` and `glob = "0.3"` dependencies
+- `src/main.rs` slimmed to CLI parsing + mode dispatch; adds `--hpo <DB_PATH>` and `--study <NAME>` flags; `path` argument becomes optional (not needed in HPO mode)
+- `src/charts.rs` — new module: shared `MetricRow`, `LogState`, symlog, label formatting, chart rendering functions extracted from old `main.rs`
+- `src/training.rs` — new module: training mode `App` struct and rendering, extracted from old `main.rs`
+- `src/hpo/mod.rs` — new module: `HpoApp`, `HpoData`, `TrialInfo` structs, SQLite DB polling via `rusqlite`, event handling, `run_hpo()` entry point
+- `src/hpo/views.rs` — new module: 4-tab HPO rendering (Overview convergence curve, Parameters scatter grid, Best Trial training curves, Trials table with detail view)
+- After replacing, rebuild: `cd tools/monitor && cargo build --release`
+- Note: first build with `rusqlite` bundled feature will compile SQLite from source (~40s)
+
+### cli.py
+
+**Action:** Modify existing file
+
+Changes needed:
+- Add `hpo: bool = typer.Option(False, "--hpo", help="HPO monitor mode")` parameter to existing `monitor` command
+- Add HPO branch before the existing `if list_runs:` block: auto-detect `.db` files (beaupy selection if multiple), resolve and build monitor binary (same as training mode), launch `training-monitor --hpo <db_path> --interval <interval>`
 
 ---
 
