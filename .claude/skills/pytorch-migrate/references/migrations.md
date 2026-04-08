@@ -24,6 +24,8 @@ Key components:
 **Action:** Modify existing file
 
 Changes needed:
+- Add `OptimizerModeCallback` class (priority=10) before `EarlyStoppingCallback`; copy from `$TEMPLATE_DIR/callbacks.py` — search for `class OptimizerModeCallback`; hook `on_train_epoch_begin` calls `trainer.optimizer.train()` if the optimizer has a callable `train` method (needed for SPlus, ScheduleFree); hook `on_val_begin` calls `trainer.optimizer.eval()` similarly
+- Add `LossPredictionCallback` class (priority=70) after `EarlyStoppingCallback`; copy from `$TEMPLATE_DIR/callbacks.py` — search for `class LossPredictionCallback`; constructor param `max_epochs: int`; hook `on_val_end` appends val_loss to history, calls `predict_final_loss(self.val_losses, self.max_epochs)` after epoch 10, writes result to `trainer._loss_prediction`
 - Add `PrunerCallback` class (priority=85) after `WandbLoggingCallback`
 - Copy from `$TEMPLATE_DIR/callbacks.py` — search for `class PrunerCallback`
 - Constructor: `__init__(self, pruner, trial, seed)`
@@ -35,7 +37,9 @@ Changes needed:
 
 Changes needed:
 - Copy `predict_final_loss(losses, max_epochs)` function from `$TEMPLATE_DIR/util.py` (placed before the `Trainer` class)
-- Add import of `PrunerCallback` from `callbacks`
+- Add imports: `OptimizerModeCallback`, `LossPredictionCallback`, `PrunerCallback` from `callbacks`
+- In `run()` callbacks list: insert `OptimizerModeCallback()` as the FIRST callback (it must run before all others to toggle optimizer train/eval mode)
+- In `run()` callbacks list: insert `LossPredictionCallback(run_config.epochs)` after `NaNDetectionCallback()`
 - In `run()`: call `pruner.register_trial(trial.number)` at the start if pruner is not None
 - In `run()`: append `PrunerCallback(pruner, trial, seed)` to callbacks list when pruner is not None
 - In `run()` finally block: call `pruner.complete_trial(trial.number)` once after all seeds finish
@@ -199,8 +203,8 @@ Changes needed:
 
 Changes needed:
 - Add `GradientMonitorCallback`, `OverfitDetectionCallback` to imports from `callbacks`
-- In `Trainer.__init__`: add `self._max_grad_norm: float | None = None` and `self._overfit_gap_ratio: float | None = None`
-- In `run()` callbacks list: insert `GradientMonitorCallback()` after `NaNDetectionCallback()` and `OverfitDetectionCallback()` after `LossPredictionCallback`
+- In `Trainer.__init__`: add `self._max_grad_norm: float | None = None`, `self._overfit_gap_ratio: float | None = None`, and `self._loss_prediction: float | None = None` (the last is written by `LossPredictionCallback` from M1 but should be initialized here for safety)
+- In `run()` callbacks list: insert `GradientMonitorCallback()` after `NaNDetectionCallback()` (from M2) and `OverfitDetectionCallback()` after `LossPredictionCallback` (from M1). The full callback order should now be: `OptimizerModeCallback` (M1), `NaNDetectionCallback` (M2), `GradientMonitorCallback` (M5), `LossPredictionCallback` (M1), `OverfitDetectionCallback` (M5), then logging/checkpoint callbacks
 
 ### cli.py
 
@@ -214,7 +218,7 @@ For both commands, copy the full implementations from `$TEMPLATE_DIR/cli.py` —
 
 ---
 
-## M6: Dual Logging + TUI Monitor + Provenance (v6 → current)
+## M6: Dual Logging + TUI Monitor + Provenance (v6 → v7)
 
 **Detect:** `grep -c "class CSVLoggingCallback" callbacks.py` returns 0
 
@@ -224,6 +228,7 @@ For both commands, copy the full implementations from `$TEMPLATE_DIR/cli.py` —
 
 Changes needed:
 - Add `logging: str` field to `RunConfig` with default `"wandb"`
+- Add `monitor: str` field to `RunConfig` with default `"val_loss"` — forward-compatible field for checkpoint monitoring configuration at the run level
 - In `RunConfig.__post_init__`: validate that `self.logging` is one of `"wandb"` or `"tui"`; raise `ValueError` otherwise
 
 ### callbacks.py
@@ -279,6 +284,22 @@ Fields to add:
 **Action:** Copy directory from `$TEMPLATE_DIR/tools/monitor/`
 
 The directory contains a Rust workspace with a binary crate `training-monitor`. It reads `metrics.csv` in real time and renders a live terminal dashboard with loss curves, learning rate, and gradient norm plots. The `monitor` CLI command builds it automatically on first use via `cargo build --release`. Requires a Rust toolchain (`rustc` / `cargo`).
+
+### Legacy filename migration
+
+If your project has scripts or code referencing `train_log.csv`, rename **all** occurrences to `metrics.csv`. The CSV logging callback writes to `metrics.csv` (not configurable). Affected locations:
+- `util.py` — any hardcoded `train_log.csv` paths must become `metrics.csv`
+- User scripts for plotting or analysis
+- The Rust TUI monitor (`tools/monitor/`) expects `metrics.csv`
+
+### CSV column consistency (important)
+
+The CSV column names must be consistent across **three** locations:
+1. `CSVLoggingCallback._collect_metrics()` in `callbacks.py` — defines which columns are written
+2. `_list_runs()` in `cli.py` — defines the `known` set for detecting extra columns: `{"epoch", "train_loss", "val_loss", "lr", "max_grad_norm", "predicted_final_loss"}`
+3. `KNOWN` const in `tools/monitor/src/main.rs` — the Rust TUI's known column set
+
+If you add custom metrics to the CSV, you must update all three locations or the TUI monitor and `--list` command will misclassify them.
 
 ---
 

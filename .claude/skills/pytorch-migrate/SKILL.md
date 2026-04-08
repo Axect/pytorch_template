@@ -51,6 +51,8 @@ Run these checks **in order** — the first missing feature determines the start
 | `config.py` has `RunConfig` dataclass | `class RunConfig` exists | Pre-template (not migratable) |
 | `callbacks.py` exists | File exists | v0 (monolithic, pre-callback refactor) |
 | `pruner.py` has `PFLPruner` | `class PFLPruner` in pruner.py | v1 (pre-PFL pruner, before 2024-12) |
+| `callbacks.py` has `OptimizerModeCallback` | Class exists | v1 (pre-M1, missing optimizer mode toggle) |
+| `callbacks.py` has `LossPredictionCallback` | Class exists | v1 (pre-M1, missing loss prediction) |
 | `callbacks.py` has `NaNDetectionCallback` | Class exists | v2 (pre-NaN detection, before 2024-09) |
 | `callbacks.py` has `CheckpointCallback` | Class exists | v3 (pre-checkpoint, before 2025-04) |
 | `config.py` has `data` field in RunConfig | `data: str` in RunConfig | v4 (pre-data-decoupling) |
@@ -66,6 +68,8 @@ Run these checks **in order** — the first missing feature determines the start
 ```bash
 # Quick detection script
 grep -c "class PFLPruner" pruner.py 2>/dev/null || echo "0"
+grep -c "class OptimizerModeCallback" callbacks.py 2>/dev/null || echo "0"
+grep -c "class LossPredictionCallback" callbacks.py 2>/dev/null || echo "0"
 grep -c "class NaNDetectionCallback" callbacks.py 2>/dev/null || echo "0"
 grep -c "class CheckpointCallback" callbacks.py 2>/dev/null || echo "0"
 grep -c "data: str" config.py 2>/dev/null || echo "0"
@@ -90,7 +94,7 @@ Read `references/migrations.md` for the structural migration guide. Each migrati
 
 | Migration | From | Changes |
 |-----------|------|---------|
-| M1: PFL Pruner | v1→v2 | Add `pruner.py`, update `optimize_template.yaml` |
+| M1: PFL Pruner + Core Callbacks | v1→v2 | Add `pruner.py`, `OptimizerModeCallback`, `LossPredictionCallback`, update `optimize_template.yaml` |
 | M2: NaN Detection + Checkpoint | v2→v3 | Add NaN/Checkpoint callbacks, add `CheckpointConfig` to `config.py` |
 | M3: Modular CLI | v3→v4 | Add `cli.py` with typer, refactor `main.py` |
 | M4: Data Decoupling | v4→v5 | Add `data` field to `RunConfig`, add `load_data()` method, update CLI |
