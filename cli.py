@@ -706,8 +706,18 @@ def monitor(
             )
 
         console.print(table)
-        console.print("[dim]Use: python -m cli monitor <path>[/dim]")
-        return
+
+        # Interactive selection
+        from beaupy import select
+        choices = [
+            f"{run['project']}/{run['group']}/{run['seed']} ({run['epochs']} ep)"
+            for run in runs
+        ]
+        selected = select(choices, cursor_index=0, return_index=True)
+        if selected is None:
+            return
+        path = runs[selected]["path"]
+        console.print(f"[dim]Selected: {path}[/dim]")
 
     monitor_bin = os.path.join(os.path.dirname(__file__), "tools", "monitor", "target", "release", "training-monitor")
 
