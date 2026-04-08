@@ -344,14 +344,27 @@ fn render_param_scatter(frame: &mut Frame, app: &HpoApp, area: Rect, param_idx: 
         .iter()
         .map(|(x, _)| *x)
         .fold(f64::NEG_INFINITY, f64::max);
-    let y_min = all_points
+    let auto_y_min = all_points
         .iter()
         .map(|(_, y)| *y)
         .fold(f64::INFINITY, f64::min);
-    let y_max = all_points
+    let auto_y_max = all_points
         .iter()
         .map(|(_, y)| *y)
         .fold(f64::NEG_INFINITY, f64::max);
+
+    // Apply user y_bounds override
+    let (y_min, y_max) = if let Some((user_lo, user_hi)) = app.y_bounds {
+        let lo = if user_lo.is_finite() {
+            if app.log_y { user_lo.max(1e-20).log10() } else { user_lo }
+        } else { auto_y_min };
+        let hi = if user_hi.is_finite() {
+            if app.log_y { user_hi.max(1e-20).log10() } else { user_hi }
+        } else { auto_y_max };
+        (lo, hi)
+    } else {
+        (auto_y_min, auto_y_max)
+    };
 
     let x_pad = (x_max - x_min).max(1e-10) * 0.15;
     let y_pad = (y_max - y_min).max(1e-10) * 0.1;
@@ -652,14 +665,28 @@ fn render_hpo_status(frame: &mut Frame, app: &HpoApp, area: Rect) {
         _ => "",
     };
 
+    let zoom_hint = if app.y_bounds.is_some() {
+        " │ +/-: zoom │ ↑↓: pan │ r: reset"
+    } else {
+        " │ +/-: zoom │ ↑↓: pan"
+    };
+
+    // Only show zoom hint on chart tabs (not Trials table)
+    let zoom_str = if app.active_tab == 3 && !app.trial_detail_mode {
+        ""
+    } else {
+        zoom_hint
+    };
+
     let text = format!(
-        " Tab: {} │ Trials: {}/{} completed │ {} │ Study: {}\n q: quit │ l: log │ ←→: tabs{}{}",
+        " Tab: {} │ Trials: {}/{} completed │ {} │ Study: {}\n q: quit │ l: log │ ←→: tabs{}{}{}",
         tab_name,
         completed,
         total,
         best_str,
         app.hpo_data.study_name,
         extra_keys,
+        zoom_str,
         log_tags,
     );
 

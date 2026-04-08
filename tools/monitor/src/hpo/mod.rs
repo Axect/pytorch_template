@@ -418,6 +418,18 @@ impl HpoApp {
         curve
     }
 
+    /// Compute Y-axis bounds from trial objective values (original scale, not log).
+    fn auto_y_bounds(&self) -> (f64, f64) {
+        let values: Vec<f64> = self.hpo_data.trials.iter().filter_map(|t| t.value).collect();
+        if values.is_empty() {
+            return (0.0, 1.0);
+        }
+        let min = values.iter().copied().fold(f64::INFINITY, f64::min);
+        let max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let pad = (max - min).max(1e-10) * 0.1;
+        (min - pad, max + pad)
+    }
+
     pub fn handle_event(&mut self, ev: Event) -> bool {
         if let Event::Key(key) = ev {
             if key.kind != KeyEventKind::Press {
@@ -455,20 +467,49 @@ impl HpoApp {
                     }
                 }
                 KeyCode::Up => {
-                    if self.active_tab == 3
-                        && !self.trial_detail_mode
-                        && self.selected_trial > 0
-                    {
-                        self.selected_trial -= 1;
+                    if self.active_tab == 3 && !self.trial_detail_mode {
+                        // Trials table: row selection
+                        if self.selected_trial > 0 {
+                            self.selected_trial -= 1;
+                        }
+                    } else {
+                        // Other tabs: pan Y axis up
+                        let (lo, hi) = self.y_bounds.unwrap_or_else(|| self.auto_y_bounds());
+                        let shift = (hi - lo) * 0.1;
+                        self.y_bounds = Some((lo + shift, hi + shift));
                     }
                 }
                 KeyCode::Down => {
                     if self.active_tab == 3 && !self.trial_detail_mode {
+                        // Trials table: row selection
                         let max = self.sorted_trial_indices().len().saturating_sub(1);
                         if self.selected_trial < max {
                             self.selected_trial += 1;
                         }
+                    } else {
+                        // Other tabs: pan Y axis down
+                        let (lo, hi) = self.y_bounds.unwrap_or_else(|| self.auto_y_bounds());
+                        let shift = (hi - lo) * 0.1;
+                        self.y_bounds = Some((lo - shift, hi - shift));
                     }
+                }
+                KeyCode::Char('+') | KeyCode::Char('=') => {
+                    // Zoom in: narrow Y range by 20%
+                    let (lo, hi) = self.y_bounds.unwrap_or_else(|| self.auto_y_bounds());
+                    let center = (lo + hi) / 2.0;
+                    let half = (hi - lo) / 2.0 * 0.8;
+                    self.y_bounds = Some((center - half, center + half));
+                }
+                KeyCode::Char('-') => {
+                    // Zoom out: widen Y range by 25%
+                    let (lo, hi) = self.y_bounds.unwrap_or_else(|| self.auto_y_bounds());
+                    let center = (lo + hi) / 2.0;
+                    let half = (hi - lo) / 2.0 * 1.25;
+                    self.y_bounds = Some((center - half, center + half));
+                }
+                KeyCode::Char('r') => {
+                    // Reset to auto range
+                    self.y_bounds = None;
                 }
                 KeyCode::Enter => {
                     if self.active_tab == 3 && !self.trial_detail_mode {
