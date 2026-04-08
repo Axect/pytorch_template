@@ -665,11 +665,44 @@ def monitor(
     ),
     interval: int = typer.Option(500, help="Refresh interval in milliseconds"),
     list_runs: bool = typer.Option(False, "--list", help="List available runs"),
+    hpo: bool = typer.Option(False, "--hpo", help="HPO monitor mode"),
 ):
     """Launch the real-time TUI training monitor (Rust binary)."""
     import os
     import subprocess
     import glob as glob_mod
+
+    if hpo:
+        # Auto-detect DB
+        db_files = glob_mod.glob("*.db")
+        if len(db_files) == 1:
+            db_path = db_files[0]
+        elif not db_files:
+            console.print("[red]No .db files found. Run HPO first.[/red]")
+            raise typer.Exit(code=1)
+        else:
+            from beaupy import select
+            selected = select(db_files, cursor_index=0, return_index=True)
+            if selected is None:
+                return
+            db_path = db_files[selected]
+
+        console.print(f"[dim]Using DB: {db_path}[/dim]")
+
+        monitor_bin = os.path.join(os.path.dirname(__file__), "tools", "monitor", "target", "release", "training-monitor")
+        if not os.path.exists(monitor_bin):
+            console.print("[yellow]Monitor binary not found. Building...[/yellow]")
+            cargo_dir = os.path.join(os.path.dirname(__file__), "tools", "monitor")
+            result = subprocess.run(["cargo", "build", "--release"], cwd=cargo_dir)
+            if result.returncode != 0:
+                console.print("[red]Failed to build monitor. Install Rust: https://rustup.rs[/red]")
+                raise typer.Exit(code=1)
+
+        try:
+            subprocess.run([monitor_bin, "--hpo", db_path, "--interval", str(interval)])
+        except KeyboardInterrupt:
+            pass
+        return
 
     if list_runs:
         runs = _list_runs()
