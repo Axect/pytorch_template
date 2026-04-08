@@ -187,6 +187,25 @@ python -m cli monitor runs/MyProject/group/42/metrics.csv  # specific file
 | `l` | Toggle log scale |
 | `←` / `→` | Switch metric tabs (when custom metrics are logged) |
 
+### HPO Monitoring
+
+The same binary supports real-time HPO monitoring by reading the Optuna SQLite database:
+
+```bash
+python -m cli monitor --hpo   # auto-detects .db file
+```
+
+Four tabs: **Overview** (trial scatter + best convergence), **Parameters** (per-parameter scatter grid), **Best Trial** (training curves of current best), **Trials** (interactive table — select a row and press `Enter` to view its curves).
+
+| Key | Action |
+|-----|--------|
+| `+` / `-` | Y-axis zoom in/out |
+| `↑` / `↓` | Y-axis pan (or row selection in Trials tab) |
+| `r` | Reset Y axis to auto |
+| `x` | Toggle X-axis log (Parameters tab) |
+
+See [Chapter 4: HPO — Monitoring in Real-time](docs/04_hpo.md#monitoring-hpo-in-real-time) for details.
+
 ---
 
 ## Pre-flight Check

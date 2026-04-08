@@ -208,6 +208,15 @@ Key insight: With SPlus + ExpHyperbolicLR, **10 epochs is enough for HPO**. The 
 
 The PFLPruner stops unpromising trials early by predicting their final loss from the first few epochs. This can cut HPO wall time by 30-60%.
 
+While HPO runs, you can monitor progress in real time with the TUI's `--hpo` mode:
+
+```bash
+# In a separate terminal
+python -m cli monitor --hpo
+```
+
+This shows a live scatter of trial objective values, parameter scatter grids, and the best trial's training curves — all updated as new trials complete. See **[Chapter 4: Monitoring HPO in Real-time](04_hpo.html#monitoring-hpo-in-real-time)** for the full tab reference.
+
 See **[Chapter 4: Hyperparameter Optimization](04_hpo.html)** for search space design, sampler choice, and pruner tuning.
 
 ---
