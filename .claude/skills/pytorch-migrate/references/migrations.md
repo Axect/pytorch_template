@@ -282,6 +282,35 @@ The directory contains a Rust workspace with a binary crate `training-monitor`. 
 
 ---
 
+## M7: TUI Monitor Tabs + CLI Enhancements (v7 → current)
+
+**Detect:** `grep -c "def update_skills" cli.py` returns 0
+
+### tools/monitor/src/main.rs
+
+**Action:** Replace from `$TEMPLATE_DIR/tools/monitor/src/main.rs`
+
+Changes from previous version:
+- `MetricRow` struct gains `extras: Vec<Option<f64>>` field for dynamic CSV columns
+- `App` struct gains `active_tab: usize` and `extra_columns: Vec<String>` for tab navigation
+- `try_reload()` now detects all CSV columns beyond the known set (`epoch`, `train_loss`, `val_loss`, `lr`, `max_grad_norm`, `predicted_final_loss`) and parses them into `extras`
+- New rendering: `render_tab_bar()` shows tab names with `ratatui::widgets::Tabs`, `render_overview()` replaces the old monolithic render, `render_extra_tab()` draws a full-height chart for one extra column
+- `render_generic_chart()` handles data with negative values (symlog transform)
+- `handle_event()` adds `KeyCode::Right`/`KeyCode::Left`/`KeyCode::Tab`/`KeyCode::BackTab` for tab switching
+- Status bar help text conditionally shows `←→: tabs` when extra columns are present
+- After replacing the file, rebuild: `cd tools/monitor && cargo build --release`
+
+### cli.py
+
+**Action:** Modify existing file
+
+Changes needed:
+- Add `_list_runs()` helper function — scans `runs/**/metrics.csv`, parses path components (project/group/seed), reads epoch count and detects extra CSV columns beyond the known set; returns list sorted by modification time (newest first)
+- Update `monitor` command — add `list_runs: bool` option (`--list` flag); when True, calls `_list_runs()` and renders a Rich table with columns: #, Project, Group, Seed, Epochs, Updated (relative time), Extra Metrics
+- Add `update_skills` command (`update-skills`) — params: `copy` bool (`--copy`, default False), `uninstall` bool (`--uninstall`, default False); resolves template skills at `.claude/skills/` relative to `__file__`; target is `~/.claude/skills/`; for each skill (`pytorch-train`, `pytorch-migrate`): detects current state (symlink/copy/missing), installs as symlink by default or copy with `--copy`, uninstalls with `--uninstall`; renders a Rich table showing status per skill
+
+---
+
 ## How to Apply Migrations to a Real Project
 
 For projects that forked or diverged significantly from the template (custom `util.py`, custom callbacks, etc.):

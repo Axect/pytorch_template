@@ -601,17 +601,113 @@ def analyze(
         raise typer.Exit(code=1)
 
 
+def _list_runs():
+    """Scan runs/ for metrics.csv files and return metadata sorted by recency."""
+    import os
+    import csv as csv_mod
+    import glob as glob_mod
+    from datetime import datetime
+
+    candidates = glob_mod.glob("runs/**/metrics.csv", recursive=True)
+    if not candidates:
+        return []
+
+    runs = []
+    for csv_path in candidates:
+        parts = csv_path.replace("\\", "/").split("/")
+        # Expected: runs/{project}/{group}/{seed}/metrics.csv
+        if len(parts) >= 5:
+            project, group, seed = parts[1], parts[2], parts[3]
+        else:
+            project, group, seed = "?", "?", "?"
+
+        mtime = os.path.getmtime(csv_path)
+        updated = datetime.fromtimestamp(mtime)
+
+        # Read epoch count from last row
+        epochs = 0
+        try:
+            with open(csv_path, newline="") as f:
+                reader = csv_mod.DictReader(f)
+                for row in reader:
+                    epochs = int(float(row.get("epoch", 0))) + 1
+        except Exception:
+            pass
+
+        # Detect extra columns
+        extra_cols = []
+        known = {"epoch", "train_loss", "val_loss", "lr", "max_grad_norm", "predicted_final_loss"}
+        try:
+            with open(csv_path, newline="") as f:
+                reader = csv_mod.DictReader(f)
+                extra_cols = [h for h in (reader.fieldnames or []) if h not in known]
+        except Exception:
+            pass
+
+        runs.append({
+            "path": csv_path,
+            "project": project,
+            "group": group,
+            "seed": seed,
+            "updated": updated,
+            "epochs": epochs,
+            "extra_cols": extra_cols,
+        })
+
+    runs.sort(key=lambda r: r["updated"], reverse=True)
+    return runs
+
+
 @app.command()
 def monitor(
     path: str = typer.Argument(
         None, help="Path to metrics.csv or its parent directory"
     ),
     interval: int = typer.Option(500, help="Refresh interval in milliseconds"),
+    list_runs: bool = typer.Option(False, "--list", help="List available runs"),
 ):
     """Launch the real-time TUI training monitor (Rust binary)."""
     import os
     import subprocess
     import glob as glob_mod
+
+    if list_runs:
+        runs = _list_runs()
+        if not runs:
+            console.print("[red]No metrics.csv found under runs/.[/red]")
+            raise typer.Exit(code=1)
+
+        table = Table(title="Available Runs", show_lines=True)
+        table.add_column("#", style="bold", justify="right")
+        table.add_column("Project", style="cyan")
+        table.add_column("Group")
+        table.add_column("Seed", justify="right")
+        table.add_column("Epochs", justify="right")
+        table.add_column("Updated")
+        table.add_column("Extra Metrics", style="dim")
+
+        from datetime import datetime
+        now = datetime.now()
+        for i, run in enumerate(runs, 1):
+            delta = now - run["updated"]
+            if delta.total_seconds() < 60:
+                age = f"{int(delta.total_seconds())}s ago"
+            elif delta.total_seconds() < 3600:
+                age = f"{int(delta.total_seconds() // 60)}m ago"
+            elif delta.total_seconds() < 86400:
+                age = f"{int(delta.total_seconds() // 3600)}h ago"
+            else:
+                age = run["updated"].strftime("%Y-%m-%d")
+
+            extras = ", ".join(run["extra_cols"]) if run["extra_cols"] else "-"
+            table.add_row(
+                str(i), run["project"], run["group"], run["seed"],
+                str(run["epochs"]), age, extras,
+            )
+
+        console.print(table)
+        console.print("[dim]Use: python -m cli monitor <path>[/dim]")
+        return
 
     monitor_bin = os.path.join(os.path.dirname(__file__), "tools", "monitor", "target", "release", "training-monitor")
 
@@ -636,6 +732,104 @@ def monitor(
         subprocess.run([monitor_bin, path, "--interval", str(interval)])
     except KeyboardInterrupt:
         pass
+
+
+@app.command(name="update-skills")
+def update_skills(
+    copy: bool = typer.Option(
+        False, "--copy", help="Copy files instead of symlinking"
+    ),
+    uninstall: bool = typer.Option(
+        False, "--uninstall", help="Remove globally installed skills"
+    ),
+):
+    """Install or update Claude Code skills to ~/.claude/skills/ (symlink by default)."""
+    import os
+    import shutil
+    from pathlib import Path
+
+    template_dir = Path(__file__).resolve().parent
+    skills_src = template_dir / ".claude" / "skills"
+    global_dir = Path.home() / ".claude" / "skills"
+
+    skill_names = ["pytorch-train", "pytorch-migrate"]
+
+    if uninstall:
+        for name in skill_names:
+            dest = global_dir / name
+            if dest.is_symlink():
+                dest.unlink()
+                console.print(f"  [red]Removed[/red] symlink {dest}")
+            elif dest.is_dir():
+                shutil.rmtree(dest)
+                console.print(f"  [red]Removed[/red] directory {dest}")
+            else:
+                console.print(f"  [dim]{name}: not installed[/dim]")
+        return
+
+    global_dir.mkdir(parents=True, exist_ok=True)
+
+    table = Table(title="Skill Installation", show_lines=True)
+    table.add_column("Skill", style="bold cyan")
+    table.add_column("Status")
+    table.add_column("Method")
+
+    for name in skill_names:
+        src = skills_src / name
+        dest = global_dir / name
+
+        if not src.is_dir():
+            table.add_row(name, "[red]Source not found[/red]", str(src))
+            continue
+
+        # Determine current state
+        if dest.is_symlink():
+            current_target = dest.resolve()
+            if current_target == src.resolve():
+                if copy:
+                    # Replace symlink with copy
+                    dest.unlink()
+                    shutil.copytree(src, dest)
+                    table.add_row(name, "[green]Updated[/green]", "copy (was symlink)")
+                else:
+                    table.add_row(name, "[green]Up to date[/green]", f"symlink → {src}")
+            else:
+                # Symlink to wrong target
+                dest.unlink()
+                if copy:
+                    shutil.copytree(src, dest)
+                    table.add_row(name, "[green]Updated[/green]", "copy")
+                else:
+                    dest.symlink_to(src)
+                    table.add_row(name, "[green]Relinked[/green]", f"symlink → {src}")
+        elif dest.is_dir():
+            # Existing copy — replace
+            shutil.rmtree(dest)
+            if copy:
+                shutil.copytree(src, dest)
+                table.add_row(name, "[green]Updated[/green]", "copy (replaced)")
+            else:
+                dest.symlink_to(src)
+                table.add_row(name, "[green]Updated[/green]", f"symlink (was copy)")
+        else:
+            # Fresh install
+            if copy:
+                shutil.copytree(src, dest)
+                table.add_row(name, "[green]Installed[/green]", "copy")
+            else:
+                dest.symlink_to(src)
+                table.add_row(name, "[green]Installed[/green]", f"symlink → {src}")
+
+    console.print(table)
+
+    if not copy:
+        console.print(
+            "[dim]Skills are symlinked — they auto-update when you git pull.[/dim]"
+        )
+    else:
+        console.print(
+            "[dim]Skills are copied — re-run this command after git pull to update.[/dim]"
+        )
 
 
 if __name__ == "__main__":
