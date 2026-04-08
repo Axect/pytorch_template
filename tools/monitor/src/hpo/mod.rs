@@ -109,6 +109,8 @@ pub struct HpoApp {
     pub log_x: bool,
     pub selected_trial: usize,
     pub trial_detail_mode: bool,
+    /// User-specified Y-axis bounds for objective value charts (None = auto)
+    pub y_bounds: Option<(f64, f64)>,
 
     // Timing
     pub interval: Duration,
@@ -565,7 +567,7 @@ fn parse_duration_secs(start: &str, end: &str) -> Option<f64> {
 
 // ── Public entry point ────────────────────────────────────────────────────
 
-pub fn run_hpo(db_path: PathBuf, study_name: Option<String>, interval: Duration) -> Result<()> {
+pub fn run_hpo(db_path: PathBuf, study_name: Option<String>, interval: Duration, y_bounds: Option<(f64, f64)>) -> Result<()> {
     let conn = Connection::open(&db_path)?;
 
     // Resolve study
@@ -620,6 +622,7 @@ pub fn run_hpo(db_path: PathBuf, study_name: Option<String>, interval: Duration)
         log_x: false,
         selected_trial: 0,
         trial_detail_mode: false,
+        y_bounds,
         interval,
         last_db_poll: Instant::now() - interval, // Force immediate poll
         last_trial_count: 0,
@@ -729,6 +732,7 @@ mod tests {
             log_x: false,
             selected_trial: 0,
             trial_detail_mode: false,
+            y_bounds: None,
             interval: Duration::from_secs(1),
             last_db_poll: Instant::now(),
             last_trial_count: 0,
@@ -811,6 +815,7 @@ mod tests {
             log_x: false,
             selected_trial: 0,
             trial_detail_mode: false,
+            y_bounds: None,
             interval: Duration::from_secs(1),
             last_db_poll: Instant::now(),
             last_trial_count: 0,

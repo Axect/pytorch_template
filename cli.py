@@ -666,6 +666,8 @@ def monitor(
     interval: int = typer.Option(500, help="Refresh interval in milliseconds"),
     list_runs: bool = typer.Option(False, "--list", help="List available runs"),
     hpo: bool = typer.Option(False, "--hpo", help="HPO monitor mode"),
+    y_min: float = typer.Option(None, "--y-min", help="Y-axis minimum for objective charts"),
+    y_max: float = typer.Option(None, "--y-max", help="Y-axis maximum for objective charts"),
 ):
     """Launch the real-time TUI training monitor (Rust binary)."""
     import os
@@ -699,7 +701,12 @@ def monitor(
                 raise typer.Exit(code=1)
 
         try:
-            subprocess.run([monitor_bin, "--hpo", db_path, "--interval", str(interval)])
+            cmd = [monitor_bin, "--hpo", db_path, "--interval", str(interval)]
+            if y_min is not None:
+                cmd.extend(["--y-min", str(y_min)])
+            if y_max is not None:
+                cmd.extend(["--y-max", str(y_max)])
+            subprocess.run(cmd)
         except KeyboardInterrupt:
             pass
         return

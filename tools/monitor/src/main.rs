@@ -28,13 +28,27 @@ struct Cli {
     /// Study name (required if DB contains multiple studies)
     #[arg(long)]
     study: Option<String>,
+
+    /// Y-axis minimum for objective value charts
+    #[arg(long)]
+    y_min: Option<f64>,
+
+    /// Y-axis maximum for objective value charts
+    #[arg(long)]
+    y_max: Option<f64>,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     if let Some(db_path) = cli.hpo {
-        hpo::run_hpo(db_path, cli.study, Duration::from_millis(cli.interval))
+        let y_bounds = match (cli.y_min, cli.y_max) {
+            (Some(lo), Some(hi)) => Some((lo, hi)),
+            (Some(lo), None) => Some((lo, f64::INFINITY)),
+            (None, Some(hi)) => Some((f64::NEG_INFINITY, hi)),
+            (None, None) => None,
+        };
+        hpo::run_hpo(db_path, cli.study, Duration::from_millis(cli.interval), y_bounds)
     } else {
         let path = cli.path.expect("CSV path required in training mode");
         let csv_path = if path.is_dir() { path.join("metrics.csv") } else { path };

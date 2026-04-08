@@ -158,8 +158,26 @@ fn render_overview(frame: &mut Frame, app: &HpoApp, area: Rect) {
     // Compute bounds from both datasets
     let all_points: Vec<&(f64, f64)> = scatter_data.iter().chain(best_data.iter()).collect();
     let x_max = all_points.iter().map(|(x, _)| *x).fold(0.0_f64, f64::max) + 1.0;
-    let y_min = all_points.iter().map(|(_, y)| *y).fold(f64::INFINITY, f64::min);
-    let y_max = all_points.iter().map(|(_, y)| *y).fold(f64::NEG_INFINITY, f64::max);
+    let auto_y_min = all_points.iter().map(|(_, y)| *y).fold(f64::INFINITY, f64::min);
+    let auto_y_max = all_points.iter().map(|(_, y)| *y).fold(f64::NEG_INFINITY, f64::max);
+
+    // Apply user-specified y_bounds (transform if log scale)
+    let (y_min, y_max) = if let Some((user_lo, user_hi)) = app.y_bounds {
+        let lo = if user_lo.is_finite() {
+            if app.log_y { user_lo.max(1e-20).log10() } else { user_lo }
+        } else {
+            auto_y_min
+        };
+        let hi = if user_hi.is_finite() {
+            if app.log_y { user_hi.max(1e-20).log10() } else { user_hi }
+        } else {
+            auto_y_max
+        };
+        (lo, hi)
+    } else {
+        (auto_y_min, auto_y_max)
+    };
+
     let y_pad = (y_max - y_min).max(1e-10) * 0.1;
     let y_lo = y_min - y_pad;
     let y_hi = y_max + y_pad;
@@ -171,9 +189,9 @@ fn render_overview(frame: &mut Frame, app: &HpoApp, area: Rect) {
         datasets.push(
             Dataset::default()
                 .name("trials")
-                .marker(symbols::Marker::Braille)
+                .marker(symbols::Marker::Dot)
                 .graph_type(GraphType::Scatter)
-                .style(Style::new().fg(Color::DarkGray))
+                .style(Style::new().fg(Color::Yellow))
                 .data(&scatter_data),
         );
     }
@@ -196,7 +214,7 @@ fn render_overview(frame: &mut Frame, app: &HpoApp, area: Rect) {
         } else {
             " Objective Values "
         }),
-        Span::styled("· trials ", Style::new().fg(Color::DarkGray)),
+        Span::styled("· trials ", Style::new().fg(Color::Yellow)),
         Span::styled("━ best ", Style::new().fg(Color::Green)),
     ]);
 
