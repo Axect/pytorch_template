@@ -190,7 +190,7 @@ impl HpoApp {
                     tv.value,
                     t.datetime_start, t.datetime_complete
              FROM trials t
-             LEFT JOIN trial_values tv ON t.trial_id = tv.trial_id AND tv.objective_id = 0
+             LEFT JOIN trial_values tv ON t.trial_id = tv.trial_id AND tv.objective = 0
              WHERE t.study_id = ?1
              ORDER BY t.number",
         ) {
@@ -272,9 +272,11 @@ impl HpoApp {
 
     fn load_param_names(&mut self) {
         let mut stmt = match self.conn.prepare(
-            "SELECT DISTINCT param_name, distribution_json
-             FROM trial_params WHERE study_id = ?1
-             ORDER BY param_name",
+            "SELECT DISTINCT tp.param_name, tp.distribution_json
+             FROM trial_params tp
+             JOIN trials t ON tp.trial_id = t.trial_id
+             WHERE t.study_id = ?1
+             ORDER BY tp.param_name",
         ) {
             Ok(s) => s,
             Err(_) => return,
