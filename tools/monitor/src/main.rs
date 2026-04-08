@@ -1,5 +1,6 @@
 mod charts;
 mod training;
+mod hpo;
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -32,8 +33,8 @@ struct Cli {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    if let Some(_db_path) = cli.hpo {
-        anyhow::bail!("HPO mode not yet implemented");
+    if let Some(db_path) = cli.hpo {
+        hpo::run_hpo(db_path, cli.study, Duration::from_millis(cli.interval))
     } else {
         let path = cli.path.expect("CSV path required in training mode");
         let csv_path = if path.is_dir() { path.join("metrics.csv") } else { path };
