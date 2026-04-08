@@ -208,6 +208,52 @@ Boundary Warnings:
 
 ---
 
+## Monitoring HPO in Real-time
+
+While HPO runs, you can watch its progress in a live terminal dashboard — the same Rust TUI used for training monitoring, now with an `--hpo` mode that reads the Optuna SQLite database directly.
+
+```bash
+# In a separate terminal, while HPO is running (or after it finishes)
+python -m cli monitor --hpo
+```
+
+The command auto-detects the `.db` file. If multiple databases exist, it presents a selection menu.
+
+### Tabs
+
+The HPO monitor has four tabs, navigable with `←→` or `Tab`:
+
+| Tab | What it shows |
+|-----|--------------|
+| **Overview** | Trial scatter plot (yellow dots) overlaid with best-so-far convergence line (green). Status bar shows completed/pruned/failed/running counts. |
+| **Parameters** | Grid of scatter plots — one per search-space parameter. X-axis is parameter value, Y-axis is objective. Points colored by trial state (green=complete, yellow=pruned, red=failed). Reveals which parameter regions yield good results. |
+| **Best Trial** | Training curves (loss, lr, gradient norm) of the current best trial, identical to the training monitor view. Automatically switches when a new best trial appears. |
+| **Trials** | Sortable table of all trials with parameters and duration. Select a row with `↑↓` and press `Enter` to see that trial's full training curves. `Esc` returns to the table. |
+
+### Key bindings
+
+| Key | Action | Where |
+|-----|--------|-------|
+| `q` | Quit | All tabs |
+| `←→` / `Tab` | Switch tabs | All tabs |
+| `l` | Toggle Y-axis log scale | All tabs |
+| `x` | Toggle X-axis log scale | Parameters tab |
+| `+` / `=` | Zoom in on Y axis | Overview, Parameters, Best Trial |
+| `-` | Zoom out on Y axis | Overview, Parameters, Best Trial |
+| `↑` / `↓` | Pan Y axis | Overview, Parameters, Best Trial |
+| `r` | Reset Y axis to auto range | All tabs |
+| `↑` / `↓` | Select trial row | Trials table |
+| `Enter` | View selected trial's training curves | Trials table |
+| `Esc` | Return to table | Trials detail view |
+
+### When to use
+
+- **During HPO**: watch the Overview scatter to see if trials are converging. If the scatter is narrowing around a region, the sampler is learning. If it stays spread out, your search space may be too large or your budget too small.
+- **After HPO**: switch to the Parameters tab to visually confirm which parameters matter. The `hpo-report` command gives you numbers (fANOVA importance); the scatter plots give you intuition about the landscape shape.
+- **Debugging bad runs**: use the Trials tab to inspect individual trials. Select a pruned trial to see at which epoch the loss diverged, or a failed trial to check for NaN patterns.
+
+---
+
 ## From HPO to best.yaml
 
 Once HPO completes and you have analyzed the results, create `best.yaml` for the final multi-seed run.
