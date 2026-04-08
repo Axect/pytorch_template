@@ -305,9 +305,14 @@ Changes from previous version:
 **Action:** Modify existing file
 
 Changes needed:
-- Add `_list_runs()` helper function — scans `runs/**/metrics.csv`, parses path components (project/group/seed), reads epoch count and detects extra CSV columns beyond the known set; returns list sorted by modification time (newest first)
-- Update `monitor` command — add `list_runs: bool` option (`--list` flag); when True, calls `_list_runs()` and renders a Rich table with columns: #, Project, Group, Seed, Epochs, Updated (relative time), Extra Metrics
-- Add `update_skills` command (`update-skills`) — params: `copy` bool (`--copy`, default False), `uninstall` bool (`--uninstall`, default False); resolves template skills at `.claude/skills/` relative to `__file__`; target is `~/.claude/skills/`; for each skill (`pytorch-train`, `pytorch-migrate`): detects current state (symlink/copy/missing), installs as symlink by default or copy with `--copy`, uninstalls with `--uninstall`; renders a Rich table showing status per skill
+
+1. **Add `_list_runs()` helper** — copy from `$TEMPLATE_DIR/cli.py`, search for `def _list_runs`. Place it immediately before the existing `def monitor` function. This function scans `runs/**/metrics.csv`, parses path components (project/group/seed), reads epoch count and extra CSV columns, returns list sorted by modification time.
+
+2. **Update existing `monitor` command** — find the existing `def monitor(` function and:
+   - Add parameter: `list_runs: bool = typer.Option(False, "--list", help="List available runs")`
+   - Add the `--list` branch at the top of the function body (before the monitor binary resolution). Copy the `if list_runs:` block from `$TEMPLATE_DIR/cli.py` — it calls `_list_runs()` and renders a Rich table with columns: #, Project, Group, Seed, Epochs, Updated (relative time), Extra Metrics
+
+3. **Add `update_skills` command** — copy from `$TEMPLATE_DIR/cli.py`, search for `def update_skills`. Place it before `if __name__ == "__main__":`. This command uses `import shutil` and `from pathlib import Path` (imported inside the function). It resolves template skills at `.claude/skills/` relative to `__file__`, installs as symlink by default (or copy with `--copy`) to `~/.claude/skills/`, and supports `--uninstall`
 
 ---
 
