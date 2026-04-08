@@ -1,3 +1,17 @@
+# 2026-04-08
+
+- Add dual logging: `logging: wandb` (default) or `logging: tui` for agent-friendly terminal output
+- Add CSVLoggingCallback (always active): writes `metrics.csv` every epoch with dynamic column expansion
+- Add TUILoggingCallback: structured per-epoch terminal output replacing W&B
+- Add LatestModelCallback (always active): saves `latest_model.pt` every epoch
+- Add provenance tracking: `env_snapshot.yaml` + `run_metadata.yaml` per run
+- Add Rust TUI monitor (`tools/monitor/`): real-time loss curve visualization from `metrics.csv`
+- Add `doctor` CLI command: system environment health check
+- Add `monitor` CLI command: launch TUI monitor with auto-detection
+- Improve loss prediction: shifted exponential decay `L(t) = a·exp(-b·t) + c`
+- Complete migration skill documentation (M1–M6) with detailed code-level migration steps
+- Add migration enforcement: pre-push hook blocks push when source files change without migration doc updates
+
 # 2025-04-14
 
 - Change metric of pruner: `val_loss` -> `train_loss`

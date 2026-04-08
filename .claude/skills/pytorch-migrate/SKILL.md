@@ -40,6 +40,9 @@ Run these checks **in order** — the first missing feature determines the start
 | `callbacks.py` has `GradientMonitorCallback` | Class exists | v5 (pre-diagnostics) |
 | `cli.py` has `preflight` command | `def preflight` exists | v5 (pre-preflight) |
 | `cli.py` has `hpo_report` command | `def hpo_report` exists | v5 (pre-hpo-report) |
+| `callbacks.py` has `CSVLoggingCallback` | Class exists | v6 (pre-dual-logging) |
+| `config.py` has `logging` field in RunConfig | `logging: str` in RunConfig | v6 (pre-dual-logging) |
+| `provenance.py` exists | File exists | v6 (pre-provenance) |
 | All checks pass | — | Current (up to date) |
 
 ```bash
@@ -51,6 +54,9 @@ grep -c "data: str" config.py 2>/dev/null || echo "0"
 grep -c "class GradientMonitorCallback" callbacks.py 2>/dev/null || echo "0"
 grep -c "def preflight" cli.py 2>/dev/null || echo "0"
 grep -c "def hpo_report" cli.py 2>/dev/null || echo "0"
+grep -c "class CSVLoggingCallback" callbacks.py 2>/dev/null || echo "0"
+grep -c "logging: str" config.py 2>/dev/null || echo "0"
+test -f provenance.py && echo "1" || echo "0"
 ```
 
 ---
@@ -69,7 +75,8 @@ Read `references/migrations.md` for the detailed migration steps.
 | M2: NaN Detection + Checkpoint | v2→v3 | Add NaN/Checkpoint callbacks, add `CheckpointConfig` to `config.py` |
 | M3: Modular CLI | v3→v4 | Add `cli.py` with typer, refactor `main.py` |
 | M4: Data Decoupling | v4→v5 | Add `data` field to `RunConfig`, add `load_data()` method, update CLI |
-| M5: Diagnostics + Preflight + HPO Report | v5→current | Add callbacks, CLI commands, `validate_semantics()` |
+| M5: Diagnostics + Preflight + HPO Report | v5→v6 | Add callbacks, CLI commands, `validate_semantics()` |
+| M6: Dual Logging + TUI Monitor + Provenance | v6→current | Add `CSVLoggingCallback`, `TUILoggingCallback`, `LatestModelCallback`, `provenance.py`, `logging` field, `doctor`/`monitor` CLI |
 
 ---
 

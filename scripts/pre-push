@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Pre-push hook: enforce migration doc updates when template source files change.
+# Blocks push if source files changed without corresponding migration doc updates.
+# Bypass with: git push --no-verify
+
+set -euo pipefail
+
+TEMPLATE_FILES=(
+    callbacks.py
+    config.py
+    util.py
+    cli.py
+    checkpoint.py
+    pruner.py
+    provenance.py
+    main.py
+)
+
+MIGRATION_FILES=(
+    .claude/skills/pytorch-migrate/SKILL.md
+    .claude/skills/pytorch-migrate/references/migrations.md
+)
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # Skip branch deletion
+    if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        continue
+    fi
+
+    # Determine diff range
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        # New branch: compare against default branch
+        base=$(git rev-parse --verify origin/main 2>/dev/null || git rev-parse --verify origin/master 2>/dev/null || echo "")
+        if [ -z "$base" ]; then
+            continue  # No remote base to compare against
+        fi
+        range="${base}..${local_sha}"
+    else
+        range="${remote_sha}..${local_sha}"
+    fi
+
+    changed=$(git diff --name-only "$range" 2>/dev/null || true)
+    if [ -z "$changed" ]; then
+        continue
+    fi
+
+    template_changed=false
+    changed_list=()
+    for f in "${TEMPLATE_FILES[@]}"; do
+        if echo "$changed" | grep -q "^${f}$"; then
+            template_changed=true
+            changed_list+=("$f")
+        fi
+    done
+
+    migration_changed=false
+    for f in "${MIGRATION_FILES[@]}"; do
+        if echo "$changed" | grep -q "^${f}$"; then
+            migration_changed=true
+            break
+        fi
+    done
+
+    if $template_changed && ! $migration_changed; then
+        echo ""
+        echo "================================================================"
+        echo "  BLOCKED: Template source files changed without migration docs"
+        echo "================================================================"
+        echo ""
+        echo "  Changed template files:"
+        for f in "${changed_list[@]}"; do
+            echo "    - $f"
+        done
+        echo ""
+        echo "  Please update:"
+        echo "    - .claude/skills/pytorch-migrate/SKILL.md"
+        echo "    - .claude/skills/pytorch-migrate/references/migrations.md"
+        echo ""
+        echo "  Bypass (emergency only): git push --no-verify"
+        echo ""
+        exit 1
+    fi
+done
+
+exit 0

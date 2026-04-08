@@ -268,7 +268,28 @@ Agent: Creates configs/SolarFlux_v0.3/fluxnet_run.yaml
 
 The skill encodes domain knowledge: correct lr ranges for SPlus (1e-3 to 1e+0), why `total_steps` must not be synced to HPO `epochs` for hyperbolic schedulers, and how to interpret boundary warnings.
 
-> See [`.claude/skills/pytorch-train/`](.claude/skills/pytorch-train/) for details. Existing users can run `/pytorch-migrate` to update their projects to the latest version.
+> See [`.claude/skills/pytorch-train/`](.claude/skills/pytorch-train/) for details.
+
+### Migrating Existing Projects
+
+If you have a project based on an older version of this template, the **pytorch-migrate** skill can detect your current version and apply incremental updates automatically.
+
+**Install the skill globally** (once):
+
+```bash
+mkdir -p ~/.claude/skills
+cp -r .claude/skills/pytorch-migrate ~/.claude/skills/
+```
+
+**Use in any project:**
+
+```bash
+cd ~/my-project  # any pytorch_template-based project
+# In Claude Code:
+/pytorch-migrate
+```
+
+The skill detects which features are missing (v1 through v6) and applies only the needed migrations, preserving your custom models, data loaders, and callbacks.
 
 ---
 

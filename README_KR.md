@@ -108,7 +108,28 @@ Agent: configs/SolarFlux_v0.3/fluxnet_run.yaml 생성
 
 이 skill에는 도메인 지식이 내장되어 있습니다: SPlus의 올바른 lr 범위(일반적인 1e-5~1e-2가 아닌 1e-3~1e+0), hyperbolic 스케줄러에서 `total_steps`를 HPO `epochs`와 동기화해서는 안 되는 이유, 그리고 경계 경고를 해석하는 방법. 일일이 외우지 않아도 연구 수준의 기본값을 바로 활용할 수 있습니다.
 
-> 자세한 내용은 [`.claude/skills/pytorch-train/`](.claude/skills/pytorch-train/)을 참조하십시오. 기존 사용자는 `/pytorch-migrate`를 실행하여 프로젝트를 최신 버전으로 업데이트할 수 있습니다.
+> 자세한 내용은 [`.claude/skills/pytorch-train/`](.claude/skills/pytorch-train/)을 참조하십시오.
+
+### 기존 프로젝트 마이그레이션
+
+이전 버전의 템플릿을 기반으로 한 프로젝트가 있다면, **pytorch-migrate** skill이 현재 버전을 감지하고 필요한 업데이트를 자동으로 적용합니다.
+
+**글로벌 skill 설치** (최초 1회):
+
+```bash
+mkdir -p ~/.claude/skills
+cp -r .claude/skills/pytorch-migrate ~/.claude/skills/
+```
+
+**다른 프로젝트에서 사용:**
+
+```bash
+cd ~/my-project  # pytorch_template 기반 프로젝트
+# Claude Code에서:
+/pytorch-migrate
+```
+
+skill이 누락된 기능(v1~v6)을 감지하고 필요한 마이그레이션만 적용하며, 사용자의 커스텀 모델, 데이터 로더, 콜백은 보존합니다.
 
 ## 문서 — 두 가지 Skill, 하나의 파이프라인
 
