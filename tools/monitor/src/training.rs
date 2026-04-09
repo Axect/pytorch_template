@@ -199,17 +199,109 @@ impl App {
                 KeyCode::Right | KeyCode::Tab => {
                     if n > 1 {
                         self.active_tab = (self.active_tab + 1) % n;
+                        self.focused_panel = None;
                     }
                 }
                 KeyCode::Left | KeyCode::BackTab => {
                     if n > 1 {
                         self.active_tab = (self.active_tab + n - 1) % n;
+                        self.focused_panel = None;
+                    }
+                }
+                // Number keys 1-9: toggle panel focus
+                KeyCode::Char(c @ '1'..='9') => {
+                    let idx = (c as usize) - ('1' as usize);
+                    let count = self.panel_count();
+                    if idx < count {
+                        if self.focused_panel == Some(idx) {
+                            self.focused_panel = None;
+                        } else {
+                            self.focused_panel = Some(idx);
+                        }
+                    }
+                }
+                // Zoom in: narrow Y range by 20%
+                KeyCode::Char('+') | KeyCode::Char('=') => {
+                    if self.can_zoom() {
+                        let (lo, hi) = self.get_active_bounds();
+                        let center = (lo + hi) / 2.0;
+                        let half = (hi - lo) / 2.0 * 0.8;
+                        self.set_active_bounds(Some((center - half, center + half)));
+                    }
+                }
+                // Zoom out: widen Y range by 25%
+                KeyCode::Char('-') => {
+                    if self.can_zoom() {
+                        let (lo, hi) = self.get_active_bounds();
+                        let center = (lo + hi) / 2.0;
+                        let half = (hi - lo) / 2.0 * 1.25;
+                        self.set_active_bounds(Some((center - half, center + half)));
+                    }
+                }
+                // Pan up
+                KeyCode::Up => {
+                    if self.can_zoom() {
+                        let (lo, hi) = self.get_active_bounds();
+                        let shift = (hi - lo) * 0.1;
+                        self.set_active_bounds(Some((lo + shift, hi + shift)));
+                    }
+                }
+                // Pan down
+                KeyCode::Down => {
+                    if self.can_zoom() {
+                        let (lo, hi) = self.get_active_bounds();
+                        let shift = (hi - lo) * 0.1;
+                        self.set_active_bounds(Some((lo - shift, hi - shift)));
+                    }
+                }
+                // Reset bounds
+                KeyCode::Char('r') => {
+                    if self.can_zoom() {
+                        self.set_active_bounds(None);
                     }
                 }
                 _ => {}
             }
         }
         false
+    }
+
+    /// Whether zoom/pan keys should be active
+    fn can_zoom(&self) -> bool {
+        if self.active_tab == 0 {
+            self.focused_panel.is_some() // Overview: need panel selected
+        } else {
+            true // Extra tabs: always zoomable (single panel)
+        }
+    }
+
+    /// Get current Y bounds for the active zoom target
+    fn get_active_bounds(&self) -> (f64, f64) {
+        if self.active_tab == 0 {
+            if let Some(p) = self.focused_panel {
+                self.overview_bounds[p].unwrap_or_else(|| self.auto_y_bounds_for_focused())
+            } else {
+                (0.0, 1.0)
+            }
+        } else {
+            let idx = self.active_tab - 1;
+            self.extra_bounds.get(idx).copied().flatten()
+                .unwrap_or_else(|| self.auto_y_bounds_for_focused())
+        }
+    }
+
+    /// Set Y bounds for the active zoom target
+    fn set_active_bounds(&mut self, bounds: Option<(f64, f64)>) {
+        if self.active_tab == 0 {
+            if let Some(p) = self.focused_panel {
+                self.overview_bounds[p] = bounds;
+            }
+        } else {
+            let idx = self.active_tab - 1;
+            if let Some(b) = self.extra_bounds.get_mut(idx) {
+                *b = bounds;
+            }
+        }
     }
 }
 
