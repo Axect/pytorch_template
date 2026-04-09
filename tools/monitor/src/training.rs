@@ -32,6 +32,12 @@ pub struct App {
     pub active_tab: usize,
     /// Names of dynamically detected extra CSV columns
     pub extra_columns: Vec<String>,
+    /// Currently focused panel within the active tab (None = no focus)
+    pub focused_panel: Option<usize>,
+    /// Per-panel Y-axis bounds for Overview tab: [Loss, LR, Grad]
+    pub overview_bounds: [Option<(f64, f64)>; 3],
+    /// Per-extra-tab Y-axis bounds (one per extra column)
+    pub extra_bounds: Vec<Option<(f64, f64)>>,
 }
 
 impl App {
@@ -48,6 +54,9 @@ impl App {
             },
             active_tab: 0,
             extra_columns: Vec::new(),
+            focused_panel: None,
+            overview_bounds: [None; 3],
+            extra_bounds: Vec::new(),
         }
     }
 
@@ -72,6 +81,9 @@ impl App {
             }
         }
 
+        // Grow extra_bounds to match extra_columns length
+        self.extra_bounds.resize(self.extra_columns.len(), None);
+
         // Clamp active_tab if columns were removed
         let total_tabs = 1 + self.extra_columns.len();
         if self.active_tab >= total_tabs {
@@ -94,6 +106,85 @@ impl App {
 
     pub fn total_tabs(&self) -> usize {
         1 + self.extra_columns.len()
+    }
+
+    /// Number of panels in the current tab
+    pub fn panel_count(&self) -> usize {
+        if self.active_tab == 0 {
+            let has_grad = self.metrics.iter().any(|m| m.max_grad_norm.is_some());
+            if has_grad { 3 } else { 2 }
+        } else {
+            1 // Extra tabs have 1 panel
+        }
+    }
+
+    /// Get the y_bounds for a specific overview panel
+    pub fn overview_panel_bounds(&self, panel: usize) -> Option<(f64, f64)> {
+        self.overview_bounds[panel]
+    }
+
+    /// Get the y_bounds for an extra tab
+    pub fn extra_tab_bounds(&self, col_idx: usize) -> Option<(f64, f64)> {
+        self.extra_bounds.get(col_idx).copied().flatten()
+    }
+
+    /// Auto-compute Y bounds for the currently focused panel
+    fn auto_y_bounds_for_focused(&self) -> (f64, f64) {
+        if self.active_tab == 0 {
+            match self.focused_panel {
+                Some(0) => {
+                    // Loss panel
+                    let train: Vec<(f64, f64)> = self.metrics.iter()
+                        .map(|m| (m.epoch, self.log_state.loss_y(m.train_loss)))
+                        .collect();
+                    let val: Vec<(f64, f64)> = self.metrics.iter()
+                        .map(|m| (m.epoch, self.log_state.loss_y(m.val_loss)))
+                        .collect();
+                    let (_, y_min, y_max) = crate::charts::bounds_xy(&train, &val);
+                    let pad = (y_max - y_min).max(1e-10) * 0.1;
+                    (y_min - pad, y_max + pad)
+                }
+                Some(1) => {
+                    // LR panel
+                    let data: Vec<(f64, f64)> = self.metrics.iter().map(|m| {
+                        let y = if self.log_state.log_scale { m.lr.max(1e-20).log10() } else { m.lr };
+                        (m.epoch, y)
+                    }).collect();
+                    let (y_min, y_max) = crate::charts::min_max_y(&data);
+                    let pad = (y_max - y_min).max(1e-15) * 0.1;
+                    (y_min - pad, y_max + pad)
+                }
+                Some(2) => {
+                    // Grad panel
+                    let data: Vec<(f64, f64)> = self.metrics.iter()
+                        .filter_map(|m| m.max_grad_norm.map(|g| {
+                            let y = if self.log_state.log_scale { g.max(1e-20).log10() } else { g };
+                            (m.epoch, y)
+                        })).collect();
+                    let (y_min, y_max) = crate::charts::min_max_y(&data);
+                    let pad = (y_max - y_min).max(1e-15) * 0.1;
+                    (y_min - pad, y_max + pad)
+                }
+                _ => (0.0, 1.0),
+            }
+        } else {
+            // Extra tab
+            let col_idx = self.active_tab - 1;
+            let data: Vec<(f64, f64)> = self.metrics.iter()
+                .filter_map(|m| m.extras.get(col_idx).copied().flatten().map(|v| {
+                    let y = if self.log_state.log_scale {
+                        if self.log_state.has_nonpositive {
+                            crate::charts::symlog(v, self.log_state.symlog_c)
+                        } else {
+                            v.max(1e-20).log10()
+                        }
+                    } else { v };
+                    (m.epoch, y)
+                })).collect();
+            let (y_min, y_max) = crate::charts::min_max_y(&data);
+            let pad = (y_max - y_min).max(1e-10) * 0.1;
+            (y_min - pad, y_max + pad)
+        }
     }
 
     pub fn handle_event(&mut self, ev: Event) -> bool {
