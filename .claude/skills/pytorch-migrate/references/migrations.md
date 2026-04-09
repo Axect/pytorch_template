@@ -354,7 +354,7 @@ Changes needed:
 
 2. **Update existing `monitor` command** — find the existing `def monitor(` function and:
    - Add parameter: `list_runs: bool = typer.Option(False, "--list", help="List available runs")`
-   - Add the `--list` branch at the top of the function body (before the monitor binary resolution). Copy the `if list_runs:` block from `$TEMPLATE_DIR/cli.py` — it calls `_list_runs()`, renders a Rich table, then uses `beaupy.select()` for interactive run selection and launches the monitor for the chosen run
+   - Add the `--list` branch at the top of the function body (before the monitor binary resolution). Copy the `if list_runs:` block from `$TEMPLATE_DIR/cli.py` — it calls `_list_runs()`, renders a Rich table (extra metrics column is truncated to 5 entries with a "+N more" suffix), then uses `beaupy.select()` for interactive run selection and launches the monitor for the chosen run
 
 3. **Add `update_skills` command** — copy from `$TEMPLATE_DIR/cli.py`, search for `def update_skills`. Place it before `if __name__ == "__main__":`. This command uses `import shutil` and `from pathlib import Path` (imported inside the function). It resolves template skills at `.claude/skills/` relative to `__file__`, installs as symlink by default (or copy with `--copy`) to `~/.claude/skills/`, and supports `--uninstall`
 
