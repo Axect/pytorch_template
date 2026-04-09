@@ -322,7 +322,7 @@ pub fn render(frame: &mut Frame, app: &App) {
         render_tab_bar(frame, app, tab_area);
 
         if app.active_tab == 0 {
-            render_training_overview(frame, &app.metrics, &app.log_state, content_area);
+            render_training_overview(frame, &app.metrics, &app.log_state, content_area, &app.overview_bounds, app.focused_panel);
         } else {
             render_extra_tab(frame, app, content_area, app.active_tab - 1);
         }
@@ -336,7 +336,7 @@ pub fn render(frame: &mut Frame, app: &App) {
         ])
         .areas(frame.area());
 
-        render_training_overview(frame, &app.metrics, &app.log_state, content_area);
+        render_training_overview(frame, &app.metrics, &app.log_state, content_area, &app.overview_bounds, app.focused_panel);
         render_status(frame, app, status_area);
     }
 }
@@ -381,12 +381,13 @@ pub fn render_extra_tab(frame: &mut Frame, app: &App, area: Rect, col_idx: usize
 
     let has_negative = data.iter().any(|(_, y)| *y < 0.0);
     let color = EXTRA_COLORS[col_idx % EXTRA_COLORS.len()];
+    let bounds = app.extra_tab_bounds(col_idx);
 
     if has_negative {
         // Use loss-style rendering (supports symlog for negative values)
-        render_generic_chart(frame, &app.log_state, area, &data, col_name, col_name, color);
+        render_generic_chart(frame, &app.log_state, area, &data, col_name, col_name, color, bounds, false);
     } else {
-        render_positive_chart(frame, app.log_state.log_scale, area, &data, col_name, col_name, color);
+        render_positive_chart(frame, app.log_state.log_scale, area, &data, col_name, col_name, color, bounds, false);
     }
 }
 

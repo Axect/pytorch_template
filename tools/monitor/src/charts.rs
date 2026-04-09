@@ -245,6 +245,8 @@ pub fn render_training_overview(
     metrics: &[MetricRow],
     log_state: &LogState,
     area: Rect,
+    overview_bounds: &[Option<(f64, f64)>; 3],
+    focused_panel: Option<usize>,
 ) {
     use ratatui::{layout::Constraint, layout::Layout};
 
@@ -258,9 +260,9 @@ pub fn render_training_overview(
         ])
         .areas(area);
 
-        render_loss_chart(frame, metrics, log_state, loss_area);
-        render_lr_chart(frame, metrics, log_state.log_scale, lr_area);
-        render_grad_chart(frame, metrics, log_state.log_scale, grad_area);
+        render_loss_chart(frame, metrics, log_state, loss_area, overview_bounds[0], focused_panel == Some(0));
+        render_lr_chart(frame, metrics, log_state.log_scale, lr_area, overview_bounds[1], focused_panel == Some(1));
+        render_grad_chart(frame, metrics, log_state.log_scale, grad_area, overview_bounds[2], focused_panel == Some(2));
     } else {
         let [loss_area, lr_area] = Layout::vertical([
             Constraint::Percentage(65),
@@ -268,8 +270,8 @@ pub fn render_training_overview(
         ])
         .areas(area);
 
-        render_loss_chart(frame, metrics, log_state, loss_area);
-        render_lr_chart(frame, metrics, log_state.log_scale, lr_area);
+        render_loss_chart(frame, metrics, log_state, loss_area, overview_bounds[0], focused_panel == Some(0));
+        render_lr_chart(frame, metrics, log_state.log_scale, lr_area, overview_bounds[1], focused_panel == Some(1));
     }
 }
 
@@ -279,6 +281,8 @@ pub fn render_loss_chart(
     metrics: &[MetricRow],
     log_state: &LogState,
     area: Rect,
+    y_bounds: Option<(f64, f64)>,
+    focused: bool,
 ) {
     if metrics.is_empty() {
         frame.render_widget(
@@ -300,9 +304,12 @@ pub fn render_loss_chart(
         .collect();
 
     let (x_max, y_min, y_max) = bounds_xy(&train, &val);
-    let y_pad = (y_max - y_min).max(1e-10) * 0.1;
-    let y_lo = y_min - y_pad;
-    let y_hi = y_max + y_pad;
+    let (y_lo, y_hi) = if let Some((lo, hi)) = y_bounds {
+        (lo, hi)
+    } else {
+        let y_pad = (y_max - y_min).max(1e-10) * 0.1;
+        (y_min - y_pad, y_max + y_pad)
+    };
 
     let mut datasets = vec![
         Dataset::default()
@@ -354,8 +361,14 @@ pub fn render_loss_chart(
         Span::styled("━ val ", Style::new().fg(Color::Yellow)),
     ]);
 
+    let border_style = if focused {
+        Style::new().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+
     let chart = Chart::new(datasets)
-        .block(Block::bordered().title(title))
+        .block(Block::bordered().title(title).border_style(border_style))
         .x_axis(
             Axis::default()
                 .title("epoch")
@@ -380,6 +393,8 @@ pub fn render_lr_chart(
     metrics: &[MetricRow],
     log_scale: bool,
     area: Rect,
+    y_bounds: Option<(f64, f64)>,
+    focused: bool,
 ) {
     if metrics.is_empty() {
         frame.render_widget(
@@ -391,7 +406,7 @@ pub fn render_lr_chart(
     }
 
     let data: Vec<(f64, f64)> = metrics.iter().map(|m| (m.epoch, m.lr)).collect();
-    render_positive_chart(frame, log_scale, area, &data, "Learning Rate", "lr", Color::Green);
+    render_positive_chart(frame, log_scale, area, &data, "Learning Rate", "lr", Color::Green, y_bounds, focused);
 }
 
 /// Render the gradient norm chart.
@@ -400,6 +415,8 @@ pub fn render_grad_chart(
     metrics: &[MetricRow],
     log_scale: bool,
     area: Rect,
+    y_bounds: Option<(f64, f64)>,
+    focused: bool,
 ) {
     let grad: Vec<(f64, f64)> = metrics
         .iter()
@@ -415,7 +432,7 @@ pub fn render_grad_chart(
         return;
     }
 
-    render_positive_chart(frame, log_scale, area, &grad, "Gradient Norm", "\u{2016}\u{2207}\u{2016}", Color::Yellow);
+    render_positive_chart(frame, log_scale, area, &grad, "Gradient Norm", "\u{2016}\u{2207}\u{2016}", Color::Yellow, y_bounds, focused);
 }
 
 /// Shared renderer for always-positive metric charts (LR, grad norm).
@@ -428,6 +445,8 @@ pub fn render_positive_chart(
     name: &str,
     y_title: &str,
     color: Color,
+    y_bounds: Option<(f64, f64)>,
+    focused: bool,
 ) {
     let data: Vec<(f64, f64)> = raw_data
         .iter()
@@ -442,10 +461,13 @@ pub fn render_positive_chart(
         .collect();
 
     let x_max = data.last().map(|(x, _)| x + 1.0).unwrap_or(1.0);
-    let (y_min, y_max) = min_max_y(&data);
-    let y_pad = (y_max - y_min).max(1e-15) * 0.1;
-    let y_lo = y_min - y_pad;
-    let y_hi = y_max + y_pad;
+    let (y_lo, y_hi) = if let Some((lo, hi)) = y_bounds {
+        (lo, hi)
+    } else {
+        let (y_min, y_max) = min_max_y(&data);
+        let y_pad = (y_max - y_min).max(1e-15) * 0.1;
+        (y_min - y_pad, y_max + y_pad)
+    };
 
     let datasets = vec![Dataset::default()
         .name(name)
@@ -468,8 +490,14 @@ pub fn render_positive_chart(
         make_labels(y_lo, y_hi, 3, true)
     };
 
+    let border_style = if focused {
+        Style::new().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+
     let chart = Chart::new(datasets)
-        .block(Block::bordered().title(title))
+        .block(Block::bordered().title(title).border_style(border_style))
         .x_axis(
             Axis::default()
                 .title("epoch")
@@ -498,6 +526,8 @@ pub fn render_generic_chart(
     name: &str,
     y_title: &str,
     color: Color,
+    y_bounds: Option<(f64, f64)>,
+    focused: bool,
 ) {
     let data: Vec<(f64, f64)> = raw_data
         .iter()
@@ -505,10 +535,13 @@ pub fn render_generic_chart(
         .collect();
 
     let x_max = data.last().map(|(x, _)| x + 1.0).unwrap_or(1.0);
-    let (y_min, y_max) = min_max_y(&data);
-    let y_pad = (y_max - y_min).max(1e-10) * 0.1;
-    let y_lo = y_min - y_pad;
-    let y_hi = y_max + y_pad;
+    let (y_lo, y_hi) = if let Some((lo, hi)) = y_bounds {
+        (lo, hi)
+    } else {
+        let (y_min, y_max) = min_max_y(&data);
+        let y_pad = (y_max - y_min).max(1e-10) * 0.1;
+        (y_min - y_pad, y_max + y_pad)
+    };
 
     let datasets = vec![Dataset::default()
         .name(name)
@@ -526,8 +559,14 @@ pub fn render_generic_chart(
     let x_labels = make_labels(0.0, x_max, 5, false);
     let y_labels = log_state.make_loss_labels(y_lo, y_hi, 5);
 
+    let border_style = if focused {
+        Style::new().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+
     let chart = Chart::new(datasets)
-        .block(Block::bordered().title(title))
+        .block(Block::bordered().title(title).border_style(border_style))
         .x_axis(
             Axis::default()
                 .title("epoch")

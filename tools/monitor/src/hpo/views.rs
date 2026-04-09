@@ -473,7 +473,7 @@ fn render_best_trial(frame: &mut Frame, app: &HpoApp, area: Rect) {
         );
     }
 
-    render_training_overview(frame, &app.best_trial_metrics, &app.best_trial_log, chart_area);
+    render_training_overview(frame, &app.best_trial_metrics, &app.best_trial_log, chart_area, &[None; 3], None);
 }
 
 // ── Tab 3: Trials ─────────────────────────────────────────────────────────
@@ -623,7 +623,7 @@ fn render_trial_detail(frame: &mut Frame, app: &HpoApp, area: Rect) {
             chart_area,
         );
     } else {
-        render_training_overview(frame, &app.detail_metrics, &app.detail_log, chart_area);
+        render_training_overview(frame, &app.detail_metrics, &app.detail_log, chart_area, &[None; 3], None);
     }
 }
 
