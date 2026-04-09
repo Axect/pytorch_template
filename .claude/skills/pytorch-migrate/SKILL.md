@@ -60,10 +60,11 @@ Run these checks **in order** — the first missing feature determines the start
 | `cli.py` has `preflight` command | `def preflight` exists | v5 (pre-preflight) |
 | `cli.py` has `hpo_report` command | `def hpo_report` exists | v5 (pre-hpo-report) |
 | `callbacks.py` has `CSVLoggingCallback` | Class exists | v6 (pre-dual-logging) |
-| `config.py` has `logging` field in RunConfig | `logging: str` in RunConfig | v6 (pre-dual-logging) |
+| `config.py` has `logging` or `wandb` field in RunConfig | `logging: str` or `wandb: bool` in RunConfig | v6 (pre-dual-logging) |
 | `provenance.py` exists | File exists | v6 (pre-provenance) |
 | `cli.py` has `update_skills` command | `def update_skills` exists | v7 (pre-TUI-tabs) |
 | `tools/monitor/src/hpo/mod.rs` exists | File exists | v7 (pre-HPO-monitor) |
+| `config.py` has `wandb: bool` field in RunConfig | `wandb: bool` in RunConfig | v8 (pre-wandb-toggle) |
 | All checks pass | — | Current (up to date) |
 
 ```bash
@@ -82,6 +83,7 @@ grep -c "logging: str" config.py 2>/dev/null || echo "0"
 test -f provenance.py && echo "1" || echo "0"
 grep -c "def update_skills" cli.py 2>/dev/null || echo "0"
 test -f tools/monitor/src/hpo/mod.rs && echo "1" || echo "0"
+grep -c "wandb: bool" config.py 2>/dev/null || echo "0"
 ```
 
 ---
@@ -103,7 +105,8 @@ Read `references/migrations.md` for the structural migration guide. Each migrati
 | M5: Diagnostics + Preflight + HPO Report | v5→v6 | Add callbacks, CLI commands, `validate_semantics()` |
 | M6: Dual Logging + TUI Monitor + Provenance | v6→v7 | Add `CSVLoggingCallback`, `TUILoggingCallback`, `LatestModelCallback`, `provenance.py`, `logging` field, `doctor`/`monitor` CLI |
 | M7: TUI Monitor Tabs + CLI Enhancements | v7→v8 | TUI monitor dynamic column tabs, `monitor --list`, `update-skills` CLI command |
-| M8: HPO TUI Monitor | v8→current | Add HPO mode to Rust monitor, `--hpo` CLI flag, `rusqlite` dependency |
+| M8: HPO TUI Monitor | v8→v9 | Add HPO mode to Rust monitor, `--hpo` CLI flag, `rusqlite` dependency |
+| M9: wandb Toggle + Dynamic CSV Columns | v9→current | Replace `logging: str` with `wandb: bool`, TUI always active, wandb on/off, CSV columns appear dynamically when data first becomes available |
 
 ---
 

@@ -121,14 +121,6 @@ class WandbLoggingCallback(TrainingCallback):
 
         wandb.log(log_dict)
 
-        if epoch % 10 == 0 or epoch == trainer._total_epochs - 1:
-            from tqdm import tqdm
-            print_str = f"epoch: {epoch}"
-            for key, value in log_dict.items():
-                if isinstance(value, float):
-                    print_str += f", {key}: {value:.4e}"
-            tqdm.write(print_str)
-
 
 class PrunerCallback(TrainingCallback):
     """Reports metrics to Optuna pruner and raises TrialPruned if needed."""
@@ -307,11 +299,14 @@ class CSVLoggingCallback(TrainingCallback):
         }
         row.update(metrics)
         grad = getattr(trainer, '_max_grad_norm', None)
-        row["max_grad_norm"] = grad if grad is not None else ""
+        if grad is not None:
+            row["max_grad_norm"] = grad
         gap = getattr(trainer, '_overfit_gap_ratio', None)
-        row["overfit_gap_ratio"] = gap if gap is not None else ""
+        if gap is not None:
+            row["overfit_gap_ratio"] = gap
         pred = getattr(trainer, '_loss_prediction', None)
-        row["predicted_final_loss"] = pred if pred is not None else ""
+        if pred is not None:
+            row["predicted_final_loss"] = pred
         return row
 
     def on_epoch_end(self, trainer, epoch, train_loss, val_loss, metrics, **kwargs):

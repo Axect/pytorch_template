@@ -255,7 +255,7 @@ def run(
 
     # Create criterion from config
     criterion = run_config.create_criterion()
-    use_wandb = run_config.logging == "wandb"
+    use_wandb = run_config.wandb
 
     try:
         for seed in seeds:
@@ -289,10 +289,9 @@ def run(
                 LossPredictionCallback(run_config.epochs),
                 OverfitDetectionCallback(),
             ]
+            callbacks_list.append(TUILoggingCallback())
             if use_wandb:
                 callbacks_list.append(WandbLoggingCallback())
-            else:
-                callbacks_list.append(TUILoggingCallback())
             # Always-on callbacks: CSV logging + latest model save
             run_path = f"{group_path}/{run_name}"
             if not os.path.exists(run_path):

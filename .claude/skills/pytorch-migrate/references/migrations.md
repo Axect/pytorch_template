@@ -272,6 +272,29 @@ Changes needed:
 - In `run()`: record `start_time = time.time()` before `trainer.train(...)` and `end_time = time.time()` after
 - In `run()`: call `save_provenance(run_path, run_config, model, device, start_time, end_time)` after saving `model.pt`
 
+### Trainer self-logging cleanup (CRITICAL)
+
+**Action:** Remove legacy CSV/logging code from `Trainer` (or user's custom trainer)
+
+If the project's `Trainer` class (in `util.py` or a separate module) has **its own CSV logging** (e.g., `_csv_log_path`, inline `csv.writer` calls, or `tqdm.write` of metrics in `train()`), you **MUST** remove that code. Otherwise:
+- The Trainer's self-logging and `CSVLoggingCallback` will fight over the same CSV file, or write to different files
+- `TUILoggingCallback` output will be duplicated with the Trainer's own `tqdm.write` calls
+- The TUI monitor will read incomplete/malformed CSVs (e.g., only 4 columns instead of 7+)
+
+**How to identify:** Search the user's `Trainer` class for:
+- `csv.writer` / `csv.DictWriter` / `_csv_log_path` / `csv_path` — inline CSV writing
+- `tqdm.write(f"epoch` or similar formatted metric output — inline terminal logging
+- `wandb.log` called directly inside Trainer methods — inline wandb logging
+
+**How to fix:** Remove all inline logging from Trainer methods. All metric logging now flows through the callback system:
+- `CSVLoggingCallback` handles CSV writing (collects from trainer attributes + metrics dict)
+- `TUILoggingCallback` handles terminal output
+- `WandbLoggingCallback` handles wandb logging
+- `GradientMonitorCallback` sets `trainer._max_grad_norm` (read by logging callbacks)
+- `LossPredictionCallback` sets `trainer._loss_prediction` (read by logging callbacks)
+
+The Trainer's only responsibility is to call `callbacks.fire("on_epoch_end", ...)` with `train_loss`, `val_loss`, and `metrics` dict. The callbacks handle everything else.
+
 ### configs/run_template.yaml
 
 **Action:** Add field from `$TEMPLATE_DIR/configs/run_template.yaml`
@@ -366,6 +389,50 @@ Changes needed:
 
 ---
 
+## M9: wandb Toggle (v9 → current)
+
+**Detect:** `grep -c "logging: str" config.py` returns non-zero (old `logging` field still present)
+
+### config.py
+
+**Action:** Modify existing file
+
+Changes needed:
+- Replace `logging: str = "wandb"` field in `RunConfig` with `wandb: bool = True`
+- Replace the validation block that checks `self.logging not in ("wandb", "tui")` with a type check: `if not isinstance(self.wandb, bool): raise ValueError(...)`
+
+### util.py
+
+**Action:** Modify existing file
+
+Changes needed:
+- In `run()`: change `use_wandb = run_config.logging == "wandb"` to `use_wandb = run_config.wandb`
+- In `run()` callbacks list: always append `TUILoggingCallback()`, then conditionally append `WandbLoggingCallback()` if `use_wandb` (previously was either/or)
+
+### callbacks.py
+
+**Action:** Modify existing file
+
+Changes needed:
+- In `WandbLoggingCallback.on_epoch_end()`: remove the terminal print block (`if epoch % 10 == 0 ...` with `tqdm.write`) since `TUILoggingCallback` now always handles terminal output
+- In `CSVLoggingCallback._collect_metrics()`: change optional fields (`max_grad_norm`, `overfit_gap_ratio`, `predicted_final_loss`) from always-present-with-empty-string to only-included-when-not-None. Previously these fields were always set (e.g., `row["max_grad_norm"] = grad if grad is not None else ""`), now they are conditionally included (e.g., `if grad is not None: row["max_grad_norm"] = grad`). This makes columns appear dynamically at the exact epoch the data first becomes available, triggering `_flush_all()` to rewrite the CSV with the new column header and empty values for prior epochs. This also applies to any arbitrary metrics passed via the `metrics` dict — the dynamic column mechanism (`new_keys` detection → `_flush_all()`) handles them automatically
+
+### configs/run_template.yaml
+
+**Action:** Modify existing file
+
+Changes needed:
+- Replace `logging: wandb` field with `wandb: true`
+
+### User config migration
+
+For each existing YAML config file:
+- If `logging: wandb` is present, replace with `wandb: true`
+- If `logging: tui` is present, replace with `wandb: false`
+- If `logging:` field is absent, no action needed (default is `wandb: true`)
+
+---
+
 ## How to Apply Migrations to a Real Project
 
 For projects that forked or diverged significantly from the template (custom `util.py`, custom callbacks, etc.):
@@ -376,6 +443,7 @@ For projects that forked or diverged significantly from the template (custom `ut
 4. Do add new CLI commands to `cli.py` by appending, not replacing.
 5. Do add the `data:` field to all YAML run configs.
 6. Do update imports in `util.py` and wire new callbacks into `run()`.
+7. **Do remove inline logging from Trainer** — if the user's Trainer has its own CSV writing, `tqdm.write`, or `wandb.log` calls, these MUST be removed when migrating to callback-based logging (M6+). The callback system replaces all inline logging. Leaving both causes duplicate output, CSV corruption, or missing columns.
 
 ### Divergence handling
 
