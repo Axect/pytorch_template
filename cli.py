@@ -739,7 +739,15 @@ def monitor(
             else:
                 age = run["updated"].strftime("%Y-%m-%d")
 
-            extras = ", ".join(run["extra_cols"]) if run["extra_cols"] else "-"
+            max_show = 5
+            if run["extra_cols"]:
+                cols = run["extra_cols"]
+                if len(cols) <= max_show:
+                    extras = ", ".join(cols)
+                else:
+                    extras = ", ".join(cols[:max_show]) + f", ... (+{len(cols) - max_show} more)"
+            else:
+                extras = "-"
             table.add_row(
                 str(i), run["project"], run["group"], run["seed"],
                 str(run["epochs"]), age, extras,
