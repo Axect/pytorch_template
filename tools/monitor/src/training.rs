@@ -118,11 +118,6 @@ impl App {
         }
     }
 
-    /// Get the y_bounds for a specific overview panel
-    pub fn overview_panel_bounds(&self, panel: usize) -> Option<(f64, f64)> {
-        self.overview_bounds[panel]
-    }
-
     /// Get the y_bounds for an extra tab
     pub fn extra_tab_bounds(&self, col_idx: usize) -> Option<(f64, f64)> {
         self.extra_bounds.get(col_idx).copied().flatten()
@@ -429,12 +424,39 @@ pub fn render_status(frame: &mut Frame, app: &App, area: Rect) {
             " │ ←→: tabs"
         };
 
+        // Panel & zoom hints
+        let panel_count = app.panel_count();
+        let zoom_hint = if app.active_tab == 0 {
+            match app.focused_panel {
+                None if panel_count > 1 => {
+                    format!(" │ 1-{}: select panel", panel_count)
+                }
+                Some(p) => {
+                    let has_bounds = app.overview_bounds[p].is_some();
+                    let reset = if has_bounds { " │ r: reset" } else { "" };
+                    format!(
+                        " │ [panel {}] +/-: zoom │ ↑↓: pan{} │ 1-{}: panel",
+                        p + 1,
+                        reset,
+                        panel_count
+                    )
+                }
+                _ => String::new(),
+            }
+        } else {
+            let col_idx = app.active_tab - 1;
+            let has_bounds = app.extra_tab_bounds(col_idx).is_some();
+            let reset = if has_bounds { " │ r: reset" } else { "" };
+            format!(" │ +/-: zoom │ ↑↓: pan{}", reset)
+        };
+
         format!(
-            " {} │ updated {}\n q: quit │ l: log scale{}{}",
+            " {} │ updated {}\n q: quit │ l: log scale{}{}{}",
             parts.join(" │ "),
             elapsed,
             log_tag,
             tab_hint,
+            zoom_hint,
         )
     } else {
         let tab_hint = if app.extra_columns.is_empty() {

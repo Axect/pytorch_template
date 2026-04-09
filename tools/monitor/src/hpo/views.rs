@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 use crate::charts::{
-    make_inv_log10_labels, make_labels, min_max_y, render_training_overview,
+    make_inv_log10_labels, make_labels, render_training_overview,
 };
 use super::{HpoApp, ParamType, TrialState};
 
