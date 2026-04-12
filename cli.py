@@ -800,15 +800,44 @@ def update_skills(
     uninstall: bool = typer.Option(
         False, "--uninstall", help="Remove globally installed skills"
     ),
+    agent: str = typer.Option(
+        "claude",
+        "--agent",
+        help="Target agent: claude, codex, or forge",
+    ),
 ):
-    """Install or update Claude Code skills to ~/.claude/skills/ (symlink by default)."""
-    import os
+    """Install or update agent skills for Claude, Codex, or Forge."""
     import shutil
     from pathlib import Path
 
     template_dir = Path(__file__).resolve().parent
-    skills_src = template_dir / ".claude" / "skills"
-    global_dir = Path.home() / ".claude" / "skills"
+    skills_src = template_dir / "skills"
+
+    agent = agent.lower()
+    agent_dirs = {
+        "claude": Path.home() / ".claude" / "skills",
+        "codex": Path.home() / ".codex" / "skills",
+        "forge": Path.home() / "forge" / "skills",
+    }
+    agent_labels = {
+        "claude": "Claude Code",
+        "codex": "Codex",
+        "forge": "Forge",
+    }
+
+    if agent not in agent_dirs:
+        valid_agents = ", ".join(agent_dirs)
+        console.print(
+            f"[red]Unsupported agent '{agent}'. Choose one of: {valid_agents}[/red]"
+        )
+        raise typer.Exit(code=1)
+
+    if not skills_src.is_dir():
+        console.print(f"[red]Skill source directory not found: {skills_src}[/red]")
+        raise typer.Exit(code=1)
+
+    global_dir = agent_dirs[agent]
+    agent_label = agent_labels[agent]
 
     skill_names = ["pytorch-train", "pytorch-migrate"]
 
@@ -823,11 +852,12 @@ def update_skills(
                 console.print(f"  [red]Removed[/red] directory {dest}")
             else:
                 console.print(f"  [dim]{name}: not installed[/dim]")
+        console.print(f"[dim]{agent_label} skill directory: {global_dir}[/dim]")
         return
 
     global_dir.mkdir(parents=True, exist_ok=True)
 
-    table = Table(title="Skill Installation", show_lines=True)
+    table = Table(title=f"Skill Installation ({agent_label})", show_lines=True)
     table.add_column("Skill", style="bold cyan")
     table.add_column("Status")
     table.add_column("Method")
@@ -879,6 +909,7 @@ def update_skills(
                 table.add_row(name, "[green]Installed[/green]", f"symlink → {src}")
 
     console.print(table)
+    console.print(f"[dim]{agent_label} skill directory: {global_dir}[/dim]")
 
     if not copy:
         console.print(

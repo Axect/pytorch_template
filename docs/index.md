@@ -8,7 +8,7 @@ nav_order: 0
 {: .note }
 > **AI-agent-friendly by design.** Every CLI command in this template is designed to be invoked by both humans and AI agents (Claude Code, Copilot, etc.). One YAML config drives the entire pipeline — no interactive prompts, no ambiguous state.
 
-Your AI agent reads `.claude/skills/pytorch-train/SKILL.md` to know how to run experiments.
+Your AI agent reads `skills/pytorch-train/SKILL.md` to know how to run experiments.
 These docs are the human equivalent — they teach you the same pipeline, with the **why** that machines don't need.
 
 ## Why AI-Agent-Friendly?
@@ -19,7 +19,7 @@ Most ML templates assume a human is sitting at the terminal. This one doesn't.
 - **Deterministic CLI** — Every action is a single `python -m cli <verb>` command with predictable exit codes.
 - **Pre-flight validation** — Agents catch config errors in seconds before committing GPU hours.
 - **Structured output** — HPO reports, training logs, and analysis results are all machine-parseable.
-- **Agent skills included** — `.claude/skills/pytorch-train/` gives AI agents step-by-step instructions for the full pipeline.
+- **Agent skills included** — `skills/pytorch-train/` gives AI agents step-by-step instructions for the full pipeline.
 
 The result: you can tell an AI agent *"train an MLP on this dataset with HPO"* and it handles config generation, validation, optimization, and final training — end to end.
 
@@ -27,7 +27,7 @@ The result: you can tell an AI agent *"train an MLP on this dataset with HPO"* a
 
 | | AI Agent Skill | Human Skill (these docs) |
 |---|---|---|
-| **Location** | `.claude/skills/pytorch-train/` | `docs/` |
+| **Location** | `skills/pytorch-train/` | `docs/` |
 | **Reads** | Config rules, param ranges, CLI commands | Workflow intuition, design decisions, trade-offs |
 | **Learns** | What to do | Why to do it |
 | **Format** | Imperative instructions | Tutorial with examples |

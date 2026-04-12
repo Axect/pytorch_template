@@ -90,7 +90,7 @@ python -m cli analyze        ← 결과 검증 및 플롯 생성
 
 ---
 
-## AI 보조 학습 (Claude Code Skill)
+## AI 보조 학습 (Agent Skill)
 
 <div align="center">
 
@@ -98,7 +98,7 @@ python -m cli analyze        ← 결과 검증 및 플롯 생성
 
 </div>
 
-이 템플릿에는 전체 실험 생애주기를 안내하는 내장 [Claude Code](https://claude.ai/claude-code) skill이 포함되어 있습니다:
+이 템플릿에는 Claude Code, Codex, Forge에서 사용할 수 있는 내장 agent skill이 포함되어 있습니다:
 
 ```
 User: "FluxNet 모델 버전 0.3에 HPO 설정해줘"
@@ -114,24 +114,26 @@ Agent: configs/SolarFlux_v0.3/fluxnet_run.yaml 생성
 
 이 skill에는 도메인 지식이 내장되어 있습니다: SPlus의 올바른 lr 범위(일반적인 1e-5~1e-2가 아닌 1e-3~1e+0), hyperbolic 스케줄러에서 `total_steps`를 HPO `epochs`와 동기화해서는 안 되는 이유, 그리고 경계 경고를 해석하는 방법. 일일이 외우지 않아도 연구 수준의 기본값을 바로 활용할 수 있습니다.
 
-> 자세한 내용은 [`.claude/skills/pytorch-train/`](.claude/skills/pytorch-train/)을 참조하십시오.
+> 자세한 내용은 [`skills/pytorch-train/`](skills/pytorch-train/)을 참조하십시오.
 
 ### 기존 프로젝트 마이그레이션
 
 이전 버전의 템플릿을 기반으로 한 프로젝트가 있다면, **pytorch-migrate** skill이 현재 버전을 감지하고 필요한 업데이트를 자동으로 적용합니다.
 
-**글로벌 skill 설치** (최초 1회):
+**글로벌 skill 설치** (에이전트별 최초 1회):
 
 ```bash
-python -m cli update-skills          # 심볼릭 링크 (git pull 시 자동 업데이트)
-python -m cli update-skills --copy   # 또는 파일 복사
+python -m cli update-skills --agent claude          # ~/.claude/skills 에 설치
+python -m cli update-skills --agent codex           # ~/.codex/skills 에 설치
+python -m cli update-skills --agent forge           # ~/forge/skills 에 설치
+python -m cli update-skills --agent claude --copy   # 심볼릭 링크 대신 복사
 ```
 
 **다른 프로젝트에서 사용:**
 
 ```bash
 cd ~/my-project  # pytorch_template 기반 프로젝트
-# Claude Code에서:
+# 사용하는 에이전트에서:
 /pytorch-migrate
 ```
 
@@ -143,7 +145,7 @@ skill이 누락된 기능(v1~v6)을 감지하고 필요한 마이그레이션만
 
 | | AI Agent Skill | Human Skill |
 |---|---|---|
-| **위치** | `.claude/skills/pytorch-train/` | [`docs/`](https://axect.github.io/pytorch_template) |
+| **위치** | `skills/pytorch-train/` | [`docs/`](https://axect.github.io/pytorch_template) |
 | **읽는 것** | 설정 규칙, 파라미터 범위, CLI 명령어 | 워크플로우 직관, 설계 결정, 트레이드오프 |
 | **배우는 것** | *무엇을* 할지 | *왜* 하는지 |
 
@@ -321,7 +323,7 @@ python -m cli monitor --hpo   # .db 파일 자동 감지
 All pre-flight checks passed.
 ```
 
-머신이 읽을 수 있는 출력이 필요하다면 `--json`을 사용하세요 (Claude Code skill이 자동 파싱에 활용):
+머신이 읽을 수 있는 출력이 필요하다면 `--json`을 사용하세요 (agent skill이 자동 파싱에 활용):
 
 ```bash
 python -m cli preflight configs/my_run.yaml --device cuda:0 --json
@@ -442,7 +444,7 @@ pytorch_template/
 ├── recipes/            # 예제 레시피 (회귀, 분류)
 ├── tests/              # 단위 테스트
 ├── docs/               # 사람을 위한 Skill 가이드 (여러분이 읽는 문서)
-└── .claude/skills/     # AI Skills (pytorch-train, pytorch-migrate)
+└── skills/             # Agent Skills (pytorch-train, pytorch-migrate)
 ```
 
 ---
@@ -459,7 +461,7 @@ pytorch_template/
 | `python -m cli hpo-report [--db DB] [--opt-config OPT] [--top-k K] [--json]` | HPO 결과 분석: 파라미터 중요도, 경계 경고, 상위-K |
 | `python -m cli analyze [--project P] [--group G] [--seed S] [--device DEV]` | 학습된 모델 체크포인트 평가 |
 | `python -m cli monitor [PATH] [--interval MS] [--list]` | 실시간 TUI 모니터 실행 (또는 가용한 런 목록 표시) |
-| `python -m cli update-skills [--copy] [--uninstall]` | Claude Code skill을 ~/.claude/skills/에 설치/업데이트 |
+| `python -m cli update-skills [--agent AGENT] [--copy] [--uninstall]` | Claude Code, Codex, Forge용 skill 설치/업데이트 |
 
 ## 라이선스
 

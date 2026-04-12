@@ -270,9 +270,9 @@ A boundary warning means the optimizer would benefit from a wider search range.
 
 ---
 
-## AI-Assisted Training (Claude Code Skill)
+## AI-Assisted Training (Agent Skills)
 
-This template ships with a built-in [Claude Code](https://claude.ai/claude-code) skill that guides you through the entire experiment lifecycle:
+This template ships with built-in agent skills that guide the full experiment lifecycle across Claude Code, Codex, and Forge:
 
 ```
 You: "Set up HPO for my FluxNet model, version 0.3"
@@ -288,24 +288,26 @@ Agent: Creates configs/SolarFlux_v0.3/fluxnet_run.yaml
 
 The skill encodes domain knowledge: correct lr ranges for SPlus (1e-3 to 1e+0), why `total_steps` must not be synced to HPO `epochs` for hyperbolic schedulers, and how to interpret boundary warnings.
 
-> See [`.claude/skills/pytorch-train/`](.claude/skills/pytorch-train/) for details.
+> See [`skills/pytorch-train/`](skills/pytorch-train/) for details.
 
 ### Migrating Existing Projects
 
 If you have a project based on an older version of this template, the **pytorch-migrate** skill can detect your current version and apply incremental updates automatically.
 
-**Install skills globally** (once):
+**Install skills globally** (once per agent):
 
 ```bash
-python -m cli update-skills          # symlink (auto-updates with git pull)
-python -m cli update-skills --copy   # or copy if you prefer
+python -m cli update-skills --agent claude          # install to ~/.claude/skills
+python -m cli update-skills --agent codex           # install to ~/.codex/skills
+python -m cli update-skills --agent forge           # install to ~/forge/skills
+python -m cli update-skills --agent claude --copy   # copy instead of symlink
 ```
 
 **Use in any project:**
 
 ```bash
 cd ~/my-project  # any pytorch_template-based project
-# In Claude Code:
+# In your agent:
 /pytorch-migrate
 ```
 
@@ -397,7 +399,7 @@ pytorch_template/
 ├── tools/monitor/      # Rust TUI monitor (ratatui)
 ├── tests/              # Unit tests
 ├── docs/               # Human Skill Guide
-└── .claude/skills/     # AI Skills (pytorch-train, pytorch-migrate)
+└── skills/             # Agent skills (pytorch-train, pytorch-migrate)
 ```
 
 ### Output per Seed Run
@@ -427,7 +429,7 @@ runs/{project}/{group}/{seed}/
 | `hpo-report [--db DB] [--opt-config OPT] [--top-k K] [--json]` | HPO analysis: param importance, boundary warnings |
 | `analyze [--project P] [--group G] [--seed S]` | Evaluate a trained model |
 | `monitor [PATH] [--interval MS] [--list]` | Launch real-time TUI monitor (or list available runs) |
-| `update-skills [--copy] [--uninstall]` | Install/update Claude Code skills to ~/.claude/skills/ |
+| `update-skills [--agent AGENT] [--copy] [--uninstall]` | Install/update agent skills for Claude, Codex, or Forge |
 
 All commands are invoked via `python -m cli <command>`.
 
@@ -437,7 +439,7 @@ All commands are invoked via `python -m cli <command>`.
 
 | | AI Agent Skill | Human Guide |
 |---|---|---|
-| **Location** | `.claude/skills/pytorch-train/` | [`docs/`](https://axect.github.io/pytorch_template) |
+| **Location** | `skills/pytorch-train/` | [`docs/`](https://axect.github.io/pytorch_template) |
 | **Teaches** | Config rules, param ranges, CLI commands | Design decisions, trade-offs, workflow intuition |
 
 **[Read the Human Skill Guide](https://axect.github.io/pytorch_template)** — 5 chapters covering the full pipeline.

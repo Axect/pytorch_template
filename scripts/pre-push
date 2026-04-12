@@ -17,8 +17,8 @@ TEMPLATE_FILES=(
 )
 
 MIGRATION_FILES=(
-    .claude/skills/pytorch-migrate/SKILL.md
-    .claude/skills/pytorch-migrate/references/migrations.md
+    skills/pytorch-migrate/SKILL.md
+    skills/pytorch-migrate/references/migrations.md
 )
 
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -73,8 +73,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
         done
         echo ""
         echo "  Please update:"
-        echo "    - .claude/skills/pytorch-migrate/SKILL.md"
-        echo "    - .claude/skills/pytorch-migrate/references/migrations.md"
+        echo "    - skills/pytorch-migrate/SKILL.md"
+        echo "    - skills/pytorch-migrate/references/migrations.md"
         echo ""
         echo "  Bypass (emergency only): git push --no-verify"
         echo ""

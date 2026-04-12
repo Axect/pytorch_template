@@ -9,8 +9,8 @@ When modifying any of these template source files, you **MUST** also update the 
 - `checkpoint.py`, `pruner.py`, `provenance.py`, `main.py`
 
 **Migration docs to update:**
-- `.claude/skills/pytorch-migrate/SKILL.md` (version detection table + migration summary)
-- `.claude/skills/pytorch-migrate/references/migrations.md` (detailed migration steps)
+- `skills/pytorch-migrate/SKILL.md` (version detection table + migration summary)
+- `skills/pytorch-migrate/references/migrations.md` (detailed migration steps)
 
 ### When adding a new feature:
 1. Create a new migration section (M7, M8, ...) in `references/migrations.md`

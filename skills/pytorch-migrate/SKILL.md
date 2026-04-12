@@ -104,7 +104,7 @@ Read `references/migrations.md` for the structural migration guide. Each migrati
 | M4: Data Decoupling | v4→v5 | Add `data` field to `RunConfig`, add `load_data()` method, update CLI |
 | M5: Diagnostics + Preflight + HPO Report | v5→v6 | Add callbacks, CLI commands, `validate_semantics()` |
 | M6: Dual Logging + TUI Monitor + Provenance | v6→v7 | Add `CSVLoggingCallback`, `TUILoggingCallback`, `LatestModelCallback`, `provenance.py`, `logging` field, `doctor`/`monitor` CLI |
-| M7: TUI Monitor Tabs + CLI Enhancements | v7→v8 | TUI monitor dynamic column tabs, `monitor --list`, `update-skills` CLI command |
+| M7: TUI Monitor Tabs + CLI Enhancements | v7→v8 | TUI monitor dynamic column tabs, `monitor --list`, agent-aware `update-skills` CLI command |
 | M8: HPO TUI Monitor | v8→v9 | Add HPO mode to Rust monitor, `--hpo` CLI flag, `rusqlite` dependency |
 | M9: wandb Toggle + Dynamic CSV Columns | v9→current | Replace `logging: str` with `wandb: bool`, TUI always active, wandb on/off, CSV columns appear dynamically when data first becomes available |
 
