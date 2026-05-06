@@ -106,3 +106,55 @@ def test_trainer_with_callbacks():
     assert "on_epoch_end:0" in events_fired
     assert "on_epoch_end:1" in events_fired
     assert "on_train_end" in events_fired
+
+
+# ---------------------------------------------------------------------------
+# Resume / start_epoch
+# ---------------------------------------------------------------------------
+
+def test_trainer_resumes_from_start_epoch():
+    """Trainer.train(start_epoch=k) skips epochs [0..k-1] and only fires
+    epoch events for [k..epochs-1]."""
+    model, optimizer, scheduler, criterion, dl_train, dl_val = _build_trainer_components()
+
+    seen_epochs: list[int] = []
+
+    class EpochRecorder(TrainingCallback):
+        priority = 50
+
+        def on_epoch_end(self, trainer, epoch, train_loss, val_loss, metrics, **kwargs):
+            seen_epochs.append(epoch)
+
+    trainer = Trainer(
+        model=model, optimizer=optimizer, scheduler=scheduler,
+        criterion=criterion, callbacks=CallbackRunner([EpochRecorder()]),
+        device="cpu",
+    )
+    trainer.train(dl_train, dl_val, epochs=4, start_epoch=2)
+    assert seen_epochs == [2, 3]
+
+
+def test_trainer_no_op_when_start_epoch_at_or_past_end():
+    """If start_epoch >= epochs, training is a no-op but on_train_end still fires."""
+    model, optimizer, scheduler, criterion, dl_train, dl_val = _build_trainer_components()
+
+    seen_epochs: list[int] = []
+    end_fired = []
+
+    class Recorder(TrainingCallback):
+        priority = 50
+
+        def on_epoch_end(self, trainer, epoch, train_loss, val_loss, metrics, **kwargs):
+            seen_epochs.append(epoch)
+
+        def on_train_end(self, trainer, **kwargs):
+            end_fired.append(True)
+
+    trainer = Trainer(
+        model=model, optimizer=optimizer, scheduler=scheduler,
+        criterion=criterion, callbacks=CallbackRunner([Recorder()]),
+        device="cpu",
+    )
+    trainer.train(dl_train, dl_val, epochs=2, start_epoch=2)
+    assert seen_epochs == []
+    assert end_fired == [True]

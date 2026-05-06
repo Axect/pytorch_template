@@ -65,6 +65,8 @@ Run these checks **in order** — the first missing feature determines the start
 | `cli.py` has `update_skills` command | `def update_skills` exists | v7 (pre-TUI-tabs) |
 | `tools/monitor/src/hpo/mod.rs` exists | File exists | v7 (pre-HPO-monitor) |
 | `config.py` has `wandb: bool` field in RunConfig | `wandb: bool` in RunConfig | v8 (pre-wandb-toggle) |
+| `checkpoint.py` has `find_resume_checkpoint` | `def find_resume_checkpoint` exists | v9 (pre-resume) |
+| `util.py` has `start_epoch` parameter on `Trainer.train` | `start_epoch` literal in util.py | v9 (pre-resume) |
 | All checks pass | — | Current (up to date) |
 
 ```bash
@@ -84,6 +86,8 @@ test -f provenance.py && echo "1" || echo "0"
 grep -c "def update_skills" cli.py 2>/dev/null || echo "0"
 test -f tools/monitor/src/hpo/mod.rs && echo "1" || echo "0"
 grep -c "wandb: bool" config.py 2>/dev/null || echo "0"
+grep -c "def find_resume_checkpoint" checkpoint.py 2>/dev/null || echo "0"
+grep -c "start_epoch" util.py 2>/dev/null || echo "0"
 ```
 
 ---
@@ -106,7 +110,8 @@ Read `references/migrations.md` for the structural migration guide. Each migrati
 | M6: Dual Logging + TUI Monitor + Provenance | v6→v7 | Add `CSVLoggingCallback`, `TUILoggingCallback`, `LatestModelCallback`, `provenance.py`, `logging` field, `doctor`/`monitor` CLI |
 | M7: TUI Monitor Tabs + CLI Enhancements | v7→v8 | TUI monitor dynamic column tabs, `monitor --list`, agent-aware `update-skills` CLI command |
 | M8: HPO TUI Monitor | v8→v9 | Add HPO mode to Rust monitor, `--hpo` CLI flag, `rusqlite` dependency |
-| M9: wandb Toggle + Dynamic CSV Columns | v9→current | Replace `logging: str` with `wandb: bool`, TUI always active, wandb on/off, CSV columns appear dynamically when data first becomes available |
+| M9: wandb Toggle + Dynamic CSV Columns | v9→v10 | Replace `logging: str` with `wandb: bool`, TUI always active, wandb on/off, CSV columns appear dynamically when data first becomes available |
+| M10: Resume from `latest_model.pt` | v10→current | `LatestModelCallback` now writes a full training-state checkpoint; `Trainer.train` accepts `start_epoch`; `run()` honors `resume=True`; `--resume` CLI flag |
 
 ---
 

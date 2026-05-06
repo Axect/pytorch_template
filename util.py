@@ -14,7 +14,9 @@ from callbacks import (
     GradientMonitorCallback, OverfitDetectionCallback,
     CSVLoggingCallback, TUILoggingCallback, LatestModelCallback,
 )
-from checkpoint import CheckpointManager, SeedManifest
+from checkpoint import (
+    CheckpointManager, SeedManifest, find_resume_checkpoint, load_checkpoint,
+)
 from provenance import save_provenance, compute_config_hash
 
 import random
@@ -197,12 +199,21 @@ class Trainer:
         self.callbacks.fire("on_val_end", trainer=self, epoch=epoch, val_loss=val_loss, metrics={})
         return val_loss
 
-    def train(self, dl_train, dl_val, epochs):
+    def train(self, dl_train, dl_val, epochs, start_epoch: int = 0):
         self._total_epochs = epochs
-        self.callbacks.fire("on_train_begin", trainer=self, epochs=epochs)
+        self.callbacks.fire(
+            "on_train_begin", trainer=self, epochs=epochs, start_epoch=start_epoch,
+        )
         val_loss = 0
 
-        for epoch in tqdm(range(epochs), desc="Overall Progress"):
+        if start_epoch >= epochs:
+            tqdm.write(
+                f"start_epoch={start_epoch} >= epochs={epochs}; nothing to do."
+            )
+            self.callbacks.fire("on_train_end", trainer=self)
+            return val_loss
+
+        for epoch in tqdm(range(start_epoch, epochs), desc="Overall Progress"):
             train_loss = self.train_epoch(dl_train, epoch=epoch, total_epochs=epochs)
             val_loss = self.val_epoch(dl_val, epoch=epoch)
 
@@ -232,7 +243,8 @@ class Trainer:
 
 
 def run(
-    run_config: RunConfig, dl_train, dl_val, group_name=None, trial=None, pruner=None
+    run_config: RunConfig, dl_train, dl_val, group_name=None, trial=None, pruner=None,
+    resume: bool = False,
 ):
     project = run_config.project
     device = run_config.device
@@ -271,6 +283,32 @@ def run(
             scheduler = run_config.create_scheduler(optimizer)
 
             run_name = f"{seed}"
+            run_path = f"{group_path}/{run_name}"
+            if not os.path.exists(run_path):
+                os.makedirs(run_path)
+
+            config_hash = compute_config_hash(run_config)
+
+            # Resume from latest_model.pt if requested and present
+            start_epoch = 0
+            resumed_ckpt = None
+            if resume:
+                ckpt_path = find_resume_checkpoint(run_path)
+                if ckpt_path is not None:
+                    resumed_ckpt = load_checkpoint(
+                        ckpt_path, model, optimizer, scheduler,
+                        device=device, config_hash=config_hash,
+                    )
+                    start_epoch = int(resumed_ckpt["epoch"]) + 1
+                    tqdm.write(
+                        f"Resuming seed {seed} from epoch {start_epoch} "
+                        f"(checkpoint val_loss={resumed_ckpt.get('val_loss', 'n/a')})"
+                    )
+                else:
+                    tqdm.write(
+                        f"--resume requested but no latest_model.pt at {run_path}; "
+                        f"starting from scratch."
+                    )
 
             if use_wandb:
                 wandb.init(
@@ -292,27 +330,27 @@ def run(
             callbacks_list.append(TUILoggingCallback())
             if use_wandb:
                 callbacks_list.append(WandbLoggingCallback())
-            # Always-on callbacks: CSV logging + latest model save
-            run_path = f"{group_path}/{run_name}"
-            if not os.path.exists(run_path):
-                os.makedirs(run_path)
+            # Always-on callbacks: CSV logging + latest full-state checkpoint
             callbacks_list.append(CSVLoggingCallback(f"{run_path}/metrics.csv"))
-            callbacks_list.append(LatestModelCallback(f"{run_path}/latest_model.pt"))
 
+            early_stopping_cb = None
             if run_config.early_stopping_config and run_config.early_stopping_config.enabled:
-                callbacks_list.append(
-                    EarlyStoppingCallback(
-                        patience=run_config.early_stopping_config.patience,
-                        mode=run_config.early_stopping_config.mode,
-                        min_delta=run_config.early_stopping_config.min_delta,
-                    )
+                early_stopping_cb = EarlyStoppingCallback(
+                    patience=run_config.early_stopping_config.patience,
+                    mode=run_config.early_stopping_config.mode,
+                    min_delta=run_config.early_stopping_config.min_delta,
                 )
+                if resumed_ckpt is not None and "early_stopping_state" in resumed_ckpt:
+                    early_stopping_cb.load_state_dict(
+                        resumed_ckpt["early_stopping_state"]
+                    )
+                callbacks_list.append(early_stopping_cb)
             if pruner is not None and trial is not None:
                 callbacks_list.append(PrunerCallback(pruner, trial, seed))
 
-            # Create CheckpointManager if enabled
+            # CheckpointManager controls best.pt + periodic snapshots (opt-in).
+            ckpt_manager = None
             if run_config.checkpoint_config.enabled:
-                config_hash = compute_config_hash(run_config)
                 ckpt_manager = CheckpointManager(
                     run_dir=run_path,
                     save_every_n=run_config.checkpoint_config.save_every_n_epochs,
@@ -321,7 +359,15 @@ def run(
                     monitor=run_config.checkpoint_config.monitor,
                     mode=run_config.checkpoint_config.mode,
                 )
+                if resumed_ckpt is not None and "best_value" in resumed_ckpt:
+                    ckpt_manager.best_value = resumed_ckpt["best_value"]
                 callbacks_list.append(CheckpointCallback(ckpt_manager, config_hash))
+
+            callbacks_list.append(LatestModelCallback(
+                f"{run_path}/latest_model.pt",
+                config_hash=config_hash,
+                checkpoint_manager=ckpt_manager,
+            ))
 
             callback_runner = CallbackRunner(callbacks_list)
 
@@ -335,8 +381,21 @@ def run(
             )
 
             start_time = time.time()
-            val_loss = trainer.train(dl_train, dl_val, epochs=run_config.epochs)
+            val_loss = trainer.train(
+                dl_train, dl_val,
+                epochs=run_config.epochs,
+                start_epoch=start_epoch,
+            )
             end_time = time.time()
+
+            # No-op resume (start_epoch >= epochs): take val_loss from the
+            # restored checkpoint so the manifest entry is meaningful.
+            if (
+                start_epoch >= run_config.epochs
+                and resumed_ckpt is not None
+                and "val_loss" in resumed_ckpt
+            ):
+                val_loss = float(resumed_ckpt["val_loss"])
 
             # Save model & configs
             torch.save(model.state_dict(), f"{run_path}/model.pt")

@@ -211,11 +211,11 @@ Supports `state_dict()` / `load_state_dict()` for checkpoint-resume compatibilit
 
 ### 12. `LatestModelCallback` — priority 96
 
-**What it does:** Saves `model.state_dict()` to `latest_model.pt` in the run directory at the end of every epoch.
+**What it does:** Saves a full training-state checkpoint to `latest_model.pt` at the end of every epoch. The dict contains `model_state_dict`, `optimizer_state_dict`, `scheduler_state_dict`, `rng_states` (Python/NumPy/PyTorch CPU+CUDA), the current epoch, val_loss, metrics, the early-stopping callback's `state_dict()` if present, the `CheckpointManager`'s `best_value` if present, and the `config_hash`.
 
 **When it fires:** `on_epoch_end`
 
-**Why it matters:** Always active regardless of checkpoint config. Provides a lightweight, continuously-updated model snapshot (just the state dict, no optimizer/scheduler/RNG state). Useful for agents that need to inspect or evaluate the model mid-training.
+**Why it matters:** Always active regardless of `checkpoint_config`. This is the resume entry point: `python -m cli train <config> --resume` reads `latest_model.pt` and continues each non-completed seed from `epoch + 1` with optimizer/scheduler/RNG bit-exactly restored. To consume it as plain weights, do `torch.load("latest_model.pt", weights_only=False)["model_state_dict"]`.
 
 ---
 

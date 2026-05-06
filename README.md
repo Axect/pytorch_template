@@ -122,7 +122,7 @@ The training loop emits events; behaviors are independent, priority-ordered call
 | `PrunerCallback` | 85 | Report to Optuna pruner |
 | `EarlyStoppingCallback` | 90 | Patience-based stopping |
 | `CheckpointCallback` | 95 | Periodic + best-model checkpoints |
-| `LatestModelCallback` | 96 | Save `latest_model.pt` every epoch (always active) |
+| `LatestModelCallback` | 96 | Save full-state `latest_model.pt` every epoch (always active, enables `--resume`) |
 
 Add your own by subclassing `TrainingCallback` — zero changes to the training loop:
 
@@ -406,13 +406,13 @@ pytorch_template/
 
 ```
 runs/{project}/{group}/{seed}/
-├── model.pt            # Final model state_dict
-├── latest_model.pt     # Updated every epoch
-├── metrics.csv         # Real-time CSV log (all metrics)
-├── env_snapshot.yaml   # Environment metadata
-├── run_metadata.yaml   # Training metadata
-├── best.pt             # Best checkpoint (if enabled)
-└── latest.pt           # Full checkpoint (if enabled)
+├── model.pt                  # Final model state_dict (last epoch)
+├── latest_model.pt           # Full-state checkpoint, refreshed every epoch (always-on; resume entry point)
+├── metrics.csv               # Real-time CSV log (all metrics)
+├── env_snapshot.yaml         # Environment metadata
+├── run_metadata.yaml         # Training metadata
+├── best.pt                   # Best-by-val_loss full checkpoint (if checkpoint_config.enabled)
+└── checkpoint_epoch_*.pt     # Periodic snapshots, last K kept (if checkpoint_config.enabled)
 ```
 
 ---
@@ -421,7 +421,7 @@ runs/{project}/{group}/{seed}/
 
 | Command | Description |
 |---------|-------------|
-| `train <config> [--device DEV] [--optimize-config OPT]` | Train or run HPO |
+| `train <config> [--device DEV] [--optimize-config OPT] [--resume]` | Train or run HPO; `--resume` continues each seed from `latest_model.pt` |
 | `preflight <config> [--device DEV] [--json]` | 1-batch forward+backward check |
 | `validate <config>` | Structural + runtime config validation |
 | `preview <config>` | Show model architecture and param count |

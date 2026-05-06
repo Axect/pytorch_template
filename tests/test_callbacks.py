@@ -11,13 +11,17 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+import torch
+
 from callbacks import (
     TrainingCallback,
     CallbackRunner,
     NaNDetectionCallback,
     EarlyStoppingCallback,
     LossPredictionCallback,
+    LatestModelCallback,
 )
+from config import default_run_config
 
 
 # ---------------------------------------------------------------------------
@@ -152,3 +156,37 @@ def test_loss_prediction():
 
     # After epoch >= 10, _loss_prediction should be set
     assert trainer._loss_prediction is not None
+
+
+# ---------------------------------------------------------------------------
+# LatestModelCallback — full-state save for resume
+# ---------------------------------------------------------------------------
+
+def test_latest_model_callback_writes_full_checkpoint(tmp_path):
+    """LatestModelCallback persists model + optimizer + scheduler + RNG on every epoch."""
+    config = default_run_config()
+    model = config.create_model()
+    optimizer = config.create_optimizer(model)
+    scheduler = config.create_scheduler(optimizer)
+
+    save_path = str(tmp_path / "latest_model.pt")
+    cb = LatestModelCallback(save_path, config_hash="abc")
+
+    # Provide a minimal trainer surface the callback uses.
+    trainer = MagicMock()
+    trainer.model = model
+    trainer.optimizer = optimizer
+    trainer.scheduler = scheduler
+    trainer.callbacks.callbacks = []  # no early-stopping callback
+
+    cb.on_epoch_end(trainer=trainer, epoch=3, train_loss=0.1,
+                    val_loss=0.2, metrics={"mse": 0.2})
+
+    assert os.path.exists(save_path)
+    ckpt = torch.load(save_path, map_location="cpu", weights_only=False)
+    assert "model_state_dict" in ckpt
+    assert "optimizer_state_dict" in ckpt
+    assert "scheduler_state_dict" in ckpt
+    assert "rng_states" in ckpt
+    assert ckpt["epoch"] == 3
+    assert ckpt["config_hash"] == "abc"

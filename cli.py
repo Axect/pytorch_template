@@ -104,6 +104,10 @@ def train(
     run_config: str = typer.Argument(..., help="Path to the YAML config file"),
     device: str = typer.Option(None, help="Device override (e.g. 'cuda:0' or 'cpu')"),
     optimize_config: str = typer.Option(None, help="Path to optimization config for HPO"),
+    resume: bool = typer.Option(
+        False, "--resume",
+        help="Resume each seed from its latest_model.pt full-state checkpoint if present.",
+    ),
 ):
     """Train a model using the given run configuration."""
     try:
@@ -122,6 +126,12 @@ def train(
         dl_val = DataLoader(ds_val, batch_size=base_config.batch_size, shuffle=False)
 
         if optimize_config:
+            if resume:
+                console.print(
+                    "[yellow]warning:[/yellow] --resume is ignored in HPO mode "
+                    "(group names depend on trial numbers, so per-trial resume "
+                    "is not meaningful)."
+                )
             opt_config = OptimizeConfig.from_yaml(optimize_config)
             pruner = opt_config.create_pruner()
 
@@ -160,7 +170,7 @@ def train(
                 f"  Path: runs/{base_config.project}_Opt/{trial.user_attrs['group_name']}"
             )
         else:
-            run(base_config, dl_train, dl_val)
+            run(base_config, dl_train, dl_val, resume=resume)
             console.print("[bold green]Training complete.[/bold green]")
 
     except Exception:

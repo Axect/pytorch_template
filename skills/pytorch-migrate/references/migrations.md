@@ -433,6 +433,90 @@ For each existing YAML config file:
 
 ---
 
+## M10: Resume from latest_model.pt (v10 → current)
+
+**Detect:**
+- `grep -c "def find_resume_checkpoint" "$TEMPLATE_DIR/checkpoint.py"` returns non-zero in the latest template, but zero in the user's project, OR
+- `grep -c "start_epoch" "$TEMPLATE_DIR/util.py"` returns non-zero in the latest template, but zero in the user's project
+
+This migration promotes the always-on `latest_model.pt` from a weights-only
+file to a full training-state checkpoint and wires a `--resume` flag through
+the CLI so an interrupted run can be continued from `latest_model.pt`.
+
+### checkpoint.py
+
+**Action:** Modify existing file
+
+Copy the following from `$TEMPLATE_DIR/checkpoint.py`:
+- Module-level `CHECKPOINT_VERSION` constant (replaces the class attribute on `CheckpointManager`)
+- Module-level helpers: `capture_rng_states`, `restore_rng_states`, `build_checkpoint_dict`, `save_checkpoint`, `load_checkpoint`, `find_resume_checkpoint`
+- The new instance methods on `CheckpointManager` (`save_checkpoint`, `load_checkpoint`) become thin wrappers around the module-level helpers; `maybe_save` no longer writes `latest.pt` (that filename is retired in favor of `latest_model.pt`, which is now always-on via `LatestModelCallback`)
+- `CheckpointManager.__init__` keeps `best_value` as before; `save_checkpoint` now passes `self.best_value` so resume can restore it
+
+Search the latest template for: `def find_resume_checkpoint`, `def save_checkpoint`, `def load_checkpoint`, `def build_checkpoint_dict` and copy verbatim.
+
+### callbacks.py
+
+**Action:** Modify existing file
+
+Replace the existing `LatestModelCallback` class. In the latest template:
+- `LatestModelCallback.__init__` takes `(save_path, config_hash="", checkpoint_manager=None)`
+- `on_epoch_end` collects the early-stopping callback's `state_dict()` from the trainer, reads `checkpoint_manager.best_value` (if provided), and calls the module-level `checkpoint.save_checkpoint(...)` to persist a full training-state dict (model + optimizer + scheduler + RNG + early-stopping state + best_value + config_hash)
+
+Search the latest template for: `class LatestModelCallback` and copy the new body verbatim.
+
+### util.py
+
+**Action:** Modify existing file
+
+Two changes:
+
+1. `Trainer.train` gains a `start_epoch: int = 0` parameter. The epoch loop becomes `for epoch in tqdm(range(start_epoch, epochs), ...)` and an early no-op branch returns when `start_epoch >= epochs`. Search for `def train` inside `class Trainer` and copy the new body.
+
+2. `run()` gains a `resume: bool = False` parameter. Inside the seed loop:
+   - Compute `run_path` and `config_hash = compute_config_hash(run_config)` BEFORE building callbacks
+   - When `resume=True`, call `find_resume_checkpoint(run_path)`; if a `latest_model.pt` exists, call `load_checkpoint(...)` (config-hash check enforced) to restore model/optimizer/scheduler/RNG and compute `start_epoch = checkpoint["epoch"] + 1`
+   - When constructing `EarlyStoppingCallback`, call `cb.load_state_dict(resumed_ckpt["early_stopping_state"])` if a checkpoint was loaded
+   - When constructing `CheckpointManager`, set `ckpt_manager.best_value = resumed_ckpt["best_value"]` if available
+   - Pass `checkpoint_manager=ckpt_manager` and `config_hash=config_hash` to `LatestModelCallback(...)`
+   - Forward `start_epoch=start_epoch` to `trainer.train(...)`
+
+Search the latest template for: `def run(` in `util.py` and copy the new orchestration verbatim. Also update the import line: `from checkpoint import CheckpointManager, SeedManifest, find_resume_checkpoint, load_checkpoint`.
+
+### cli.py
+
+**Action:** Modify existing file
+
+Add a `resume: bool = typer.Option(False, "--resume", help=...)` parameter to the `train` command and forward it to `run(...)` in the non-HPO branch. In the HPO branch, print a warning that `--resume` is ignored (per-trial group names depend on trial numbers).
+
+Search the latest template for: `def train(` in `cli.py` and copy the parameter signature + branching verbatim.
+
+### main.py
+
+**Action:** Modify existing file
+
+Add `parser.add_argument("--resume", action="store_true", ...)` and forward `resume=args.resume` to `run(...)` in the non-HPO branch. Print the same HPO warning in the HPO branch.
+
+### Tests
+
+**Action:** Modify existing files
+
+- `tests/test_checkpoint.py`: import `find_resume_checkpoint`, `load_checkpoint`, `save_checkpoint` from `checkpoint`; add `test_module_save_load_round_trip` (covers full state restoration via the module-level API) and `test_find_resume_checkpoint`
+- `tests/test_trainer.py`: add `test_trainer_resumes_from_start_epoch` and `test_trainer_no_op_when_start_epoch_at_or_past_end`
+- `tests/test_callbacks.py`: import `LatestModelCallback` and `default_run_config`; add `test_latest_model_callback_writes_full_checkpoint` (verifies the full-state keys land on disk)
+
+Copy the test functions verbatim from the latest template's `tests/`.
+
+### Behavior summary
+
+After migration:
+- `latest_model.pt` always contains full training state (model + optimizer + scheduler + RNG + early-stopping + best_value + config_hash); resume works without enabling `checkpoint_config`
+- `checkpoint_config.enabled` continues to gate `best.pt` and periodic `checkpoint_epoch_*.pt` snapshots; the redundant `latest.pt` (formerly written by `CheckpointManager`) is gone
+- `python -m cli train <config> --resume` (or `python main.py --run_config <config> --resume`) resumes each non-completed seed from its `latest_model.pt`; a config-hash mismatch raises `ValueError` to prevent silently resuming with a changed config
+- HPO mode ignores `--resume` (per-trial group names embed `[trial.number]`, so per-trial resume isn't meaningful — the seed-level skip via `SeedManifest` already handles trial-level resumption when re-running a study)
+
+---
+
 ## How to Apply Migrations to a Real Project
 
 For projects that forked or diverged significantly from the template (custom `util.py`, custom callbacks, etc.):

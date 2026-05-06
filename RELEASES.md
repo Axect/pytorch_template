@@ -1,3 +1,10 @@
+# 2026-05-06
+
+- Promote `LatestModelCallback` to a full training-state checkpoint (`latest_model.pt` now stores model + optimizer + scheduler + RNG + early-stopping state + best_value + config_hash)
+- Add `Trainer.train(start_epoch=...)` so a run can pick up partway through the epoch loop
+- Wire `--resume` flag into `cli.py train` and `main.py`; `run()` gains a `resume` parameter that loads `latest_model.pt` per seed and rehydrates optimizer/scheduler/RNG with config-hash verification
+- `CheckpointManager` no longer writes a redundant `latest.pt`; `latest_model.pt` is the single resume entry point. `best.pt` and periodic `checkpoint_epoch_*.pt` remain opt-in via `checkpoint_config.enabled`
+
 # 2026-04-08
 
 - Add dual logging: `logging: wandb` (default) or `logging: tui` for agent-friendly terminal output

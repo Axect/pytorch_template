@@ -17,6 +17,10 @@ def main():
     parser.add_argument(
         "--device", type=str, help="Device to run on (e.g. 'cuda:0' or 'cpu')"
     )
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="Resume each seed from its latest_model.pt full-state checkpoint if present.",
+    )
     args = parser.parse_args()
 
     # Run Config
@@ -33,6 +37,11 @@ def main():
 
     # Run
     if args.optimize_config:
+        if args.resume:
+            print(
+                "warning: --resume is ignored in HPO mode (per-trial group names "
+                "depend on trial numbers, so resume is not meaningful)."
+            )
         optimize_config = OptimizeConfig.from_yaml(args.optimize_config)
         pruner = optimize_config.create_pruner()
 
@@ -72,7 +81,7 @@ def main():
         )
 
     else:
-        run(base_config, dl_train, dl_val)
+        run(base_config, dl_train, dl_val, resume=args.resume)
 
 
 if __name__ == "__main__":

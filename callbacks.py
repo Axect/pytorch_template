@@ -370,12 +370,38 @@ class TUILoggingCallback(TrainingCallback):
 
 
 class LatestModelCallback(TrainingCallback):
-    """Saves latest model state_dict every epoch."""
+    """Saves a full training-state checkpoint to ``latest_model.pt`` every epoch.
+
+    Captures model + optimizer + scheduler + RNG + early-stopping state so
+    training can be resumed from this file. Always active regardless of
+    ``checkpoint_config``.
+    """
     priority = 96
 
-    def __init__(self, save_path: str):
+    def __init__(self, save_path: str, config_hash: str = "",
+                 checkpoint_manager=None):
         self.save_path = save_path
+        self.config_hash = config_hash
+        self.checkpoint_manager = checkpoint_manager
 
     def on_epoch_end(self, trainer, epoch, train_loss, val_loss, metrics, **kwargs):
-        import torch
-        torch.save(trainer.model.state_dict(), self.save_path)
+        from checkpoint import save_checkpoint
+
+        early_stopping_state = None
+        for cb in trainer.callbacks.callbacks:
+            if isinstance(cb, EarlyStoppingCallback):
+                early_stopping_state = cb.state_dict()
+                break
+
+        best_value = (
+            self.checkpoint_manager.best_value
+            if self.checkpoint_manager is not None else None
+        )
+
+        save_checkpoint(
+            self.save_path, trainer.model, trainer.optimizer, trainer.scheduler,
+            epoch, val_loss, metrics,
+            early_stopping_state=early_stopping_state,
+            best_value=best_value,
+            config_hash=self.config_hash,
+        )
